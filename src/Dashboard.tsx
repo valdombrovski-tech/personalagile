@@ -29,9 +29,6 @@ function getTaskType(
   return date && startTime ? 'event' : 'task'
 }
 
-function formatTime(time: string | null) {
-  return time ? time.slice(0, 5) : ''
-}
 
 function Dashboard() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
