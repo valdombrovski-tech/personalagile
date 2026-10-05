@@ -1522,6 +1522,7 @@ input[type="checkbox"] {
   touch-action: pan-y;
   transition: transform 0.2s ease;
   background: #fff;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.06);
 }
 
 .swipe-actions {
@@ -1530,16 +1531,22 @@ input[type="checkbox"] {
   right: 0;
   bottom: 0;
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .swipe-action {
-  flex: 1;
+  display: flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 6px;
   padding: 0;
   border: none;
-  border-radius: 0;
+  border-radius: 50%;
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
   cursor: pointer;
 }
 
@@ -1566,4 +1573,24 @@ input[type="checkbox"] {
 .timeline-item.is-past .timeline-time,
 .timeline-item.is-past .timeline-dot {
   opacity: 0.75;
+}
+
+.task-item .task-title {
+  font-size: 15px;
+}
+
+.task-expand-button {
+  flex: 0 0 auto;
+  min-width: 32px;
+  min-height: 32px;
+  aspect-ratio: 1;
+}
+
+.expand-chevron {
+  flex-shrink: 0;
+}
+
+.task-summary {
+  min-width: 0;
+  flex: 1;
 }

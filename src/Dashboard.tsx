@@ -8,7 +8,7 @@ import {
 } from 'react'
 import './App.css'
 import { supabase } from './supabaseClient'
-import { Users, Home, Briefcase, HeartPulse, ShoppingCart, BookOpen, Dumbbell, Circle } from 'lucide-react'
+import { Users, Home, Briefcase, HeartPulse, ShoppingCart, BookOpen, Dumbbell, Circle, Inbox, Lightbulb, Check } from 'lucide-react'
 
 type LifeArea = 'meetings' | 'home' | 'work' | 'health' | 'shopping' | 'content' | 'sport'
 
@@ -145,7 +145,7 @@ const pickerProps = {
   },
 }
 
-const SWIPE_BUTTON_WIDTH = 76
+const SWIPE_BUTTON_WIDTH = 56
 
 let swipeStartX = 0
 let swipeStartY = 0
@@ -679,40 +679,46 @@ const [showSchedule, setShowSchedule] = useState(false)
         return (
       <div className="swipe-wrap">
         {canSwipe && (
-          <div className="swipe-actions" style={{ width: swipeWidth }}>
+                    <div className="swipe-actions" style={{ width: swipeWidth }}>
             {task.status !== 'inbox' && (
               <button
                 className="swipe-action swipe-inbox"
                 type="button"
+                aria-label="В Inbox"
+                title="В Inbox"
                 onClick={() => {
                   setSwipedTaskId(null)
                   void moveToInbox(task)
                 }}
               >
-                В Inbox
+                <Inbox size={20} />
               </button>
             )}
             {task.status !== 'idea' && (
               <button
                 className="swipe-action swipe-ideas"
                 type="button"
+                aria-label="В Ideas"
+                title="В Ideas"
                 onClick={() => {
                   setSwipedTaskId(null)
                   void moveToIdeas(task)
                 }}
               >
-                В Ideas
+                <Lightbulb size={20} />
               </button>
             )}
             <button
               className="swipe-action swipe-done"
               type="button"
+              aria-label="Готово"
+              title="Готово"
               onClick={() => {
                 setSwipedTaskId(null)
                 void moveToDone(task)
               }}
             >
-              Готово
+              <Check size={20} />
             </button>
           </div>
         )}
