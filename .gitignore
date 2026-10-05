@@ -29,3 +29,4 @@ dist
 .env.local
 .vercel
 .vercel
+.env*

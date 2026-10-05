@@ -1448,3 +1448,122 @@ input[type="checkbox"] {
 .task-item.is-completed:not(.is-open) {
   opacity: 0.45;
 }
+
+.task-title svg {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 8px;
+  opacity: 0.7;
+}
+
+.field-label select {
+  width: 100%;
+}
+
+.life-area-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.life-area-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.life-area-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 0.15s ease;
+}
+
+.life-area-option.is-active {
+  opacity: 1;
+}
+
+.life-area-name {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.life-area-badge {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.swipe-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.swipe-content {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
+  transition: transform 0.2s ease;
+  background: #fff;
+}
+
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+}
+
+.swipe-action {
+  flex: 1;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.swipe-inbox {
+  background: #6c8ef5;
+}
+
+.swipe-ideas {
+  background: #f5b83d;
+}
+
+.swipe-done {
+  background: #4cb782;
+}
+
+.task-item.is-completed,
+.timeline-item.is-past,
+.timeline-item.is-past .task-item {
+  opacity: 1;
+}
+
+.task-item.is-completed .task-item-main,
+.timeline-item.is-past .task-item-main,
+.timeline-item.is-past .timeline-time,
+.timeline-item.is-past .timeline-dot {
+  opacity: 0.75;
+}

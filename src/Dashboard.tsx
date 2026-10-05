@@ -4,9 +4,13 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
+    type PointerEvent as ReactPointerEvent,
 } from 'react'
 import './App.css'
 import { supabase } from './supabaseClient'
+import { Users, Home, Briefcase, HeartPulse, ShoppingCart, BookOpen, Dumbbell, Circle } from 'lucide-react'
+
+type LifeArea = 'meetings' | 'home' | 'work' | 'health' | 'shopping' | 'content' | 'sport'
 
 type Task = {
   id: string
@@ -18,6 +22,7 @@ type Task = {
   type: 'task' | 'event'
   start_time: string | null
   end_time: string | null
+    life_area: LifeArea | null
 }
 
 type View = 'today' | 'inbox' | 'in-progress' | 'ideas' | 'done'
@@ -38,6 +43,89 @@ function getTaskType(
   return date && startTime ? 'event' : 'task'
 }
 
+const LIFE_AREAS: { key: LifeArea; label: string; Icon: typeof Users }[] = [
+  { key: 'meetings', label: 'Встречи и мероприятия', Icon: Users },
+  { key: 'home', label: 'Домашние дела', Icon: Home },
+  { key: 'work', label: 'Рабочие дела', Icon: Briefcase },
+  { key: 'health', label: 'Здоровье', Icon: HeartPulse },
+  { key: 'shopping', label: 'Покупки', Icon: ShoppingCart },
+  { key: 'content', label: 'Контент', Icon: BookOpen },
+  { key: 'sport', label: 'Спорт', Icon: Dumbbell },
+]
+
+function LifeAreaIcon({ area }: { area: LifeArea | null }) {
+  const found = LIFE_AREAS.find((item) => item.key === area)
+  const Icon = found ? found.Icon : Circle
+  return <Icon size={18} aria-label={found?.label ?? 'Без сферы'} />
+}
+
+const LIFE_AREA_COLORS: Record<LifeArea, { bg: string; text: string }> = {
+  meetings: { bg: '#E8E4FB', text: '#5B47C9' },
+  home: { bg: '#FDEBD3', text: '#B5651D' },
+  work: { bg: '#DCEBFB', text: '#2A6BB5' },
+  health: { bg: '#FBE0E4', text: '#C2415A' },
+  shopping: { bg: '#FFF3C4', text: '#9A7B00' },
+  content: { bg: '#E3F4E1', text: '#3C8A36' },
+  sport: { bg: '#D9F2F0', text: '#1F8A83' },
+}
+
+function LifeAreaBadge({ area }: { area: LifeArea }) {
+  const found = LIFE_AREAS.find((item) => item.key === area)
+
+  if (!found) {
+    return null
+  }
+
+  const colors = LIFE_AREA_COLORS[area]
+
+  return (
+    <span
+      className="life-area-badge"
+      style={{ background: colors.bg, color: colors.text }}
+    >
+      {found.label}
+    </span>
+  )
+}
+
+function LifeAreaPicker({
+  value,
+  onChange,
+}: {
+  value: LifeArea | null
+  onChange: (value: LifeArea | null) => void
+}) {
+  const selected = LIFE_AREAS.find((item) => item.key === value)
+
+  return (
+    <div className="life-area-picker">
+      <div className="life-area-row" role="group" aria-label="Сфера жизни">
+        {LIFE_AREAS.map(({ key, label, Icon }) => {
+          const isActive = value === key
+
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`life-area-option ${isActive ? 'is-active' : ''}`}
+              title={label}
+              aria-label={label}
+              aria-pressed={isActive}
+              onClick={() => onChange(isActive ? null : key)}
+            >
+              <Icon size={24} />
+            </button>
+          )
+        })}
+      </div>
+
+      <p className="life-area-name">
+        {selected ? selected.label : 'Сфера жизни'}
+      </p>
+    </div>
+  )
+}
+
 function formatTime(time: string | null) {
   return time ? time.slice(0, 5) : ''
 }
@@ -55,6 +143,75 @@ const pickerProps = {
       // на iPhone выбор открывается сам при нажатии
     }
   },
+}
+
+const SWIPE_BUTTON_WIDTH = 76
+
+let swipeStartX = 0
+let swipeStartY = 0
+let swipeOffset = 0
+let swipeActive = false
+let swipeIsHorizontal = false
+let swipeJustHappened = false
+
+function handleSwipeStart(event: ReactPointerEvent<HTMLElement>) {
+  swipeStartX = event.clientX
+  swipeStartY = event.clientY
+  swipeOffset = 0
+  swipeActive = true
+  swipeIsHorizontal = false
+}
+
+function handleSwipeMove(
+  event: ReactPointerEvent<HTMLElement>,
+  width: number,
+  isSwiped: boolean
+) {
+  if (!swipeActive) return
+
+  const dx = event.clientX - swipeStartX
+  const dy = event.clientY - swipeStartY
+
+  if (!swipeIsHorizontal) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+
+    if (Math.abs(dy) > Math.abs(dx)) {
+      swipeActive = false
+      return
+    }
+
+    swipeIsHorizontal = true
+  }
+
+  const base = isSwiped ? -width : 0
+  swipeOffset = Math.max(-width, Math.min(0, base + dx))
+
+  const element = event.currentTarget
+  element.style.transition = 'none'
+  element.style.transform = `translateX(${swipeOffset}px)`
+}
+
+function handleSwipeEnd(
+  event: ReactPointerEvent<HTMLElement>,
+  width: number,
+  onResult: (isOpen: boolean) => void
+) {
+  if (!swipeActive) return
+
+  swipeActive = false
+
+  if (!swipeIsHorizontal) return
+
+  swipeJustHappened = true
+  window.setTimeout(() => {
+    swipeJustHappened = false
+  }, 50)
+
+  const element = event.currentTarget
+  element.style.transition = ''
+  element.style.transform = ''
+
+  onResult(swipeOffset < -width / 2)
 }
 
 function formatSelectedDate(date: string) {
@@ -134,6 +291,7 @@ function Dashboard() {
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskStartTime, setNewTaskStartTime] = useState('')
   const [newTaskEndTime, setNewTaskEndTime] = useState('')
+  const [newTaskLifeArea, setNewTaskLifeArea] = useState<LifeArea | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [view, setView] = useState<View>('today')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -144,7 +302,7 @@ const [showSchedule, setShowSchedule] = useState(false)
     const [now, setNow] = useState(() => new Date())
       const [showEventsHint, setShowEventsHint] = useState(false)
   const [showTodoHint, setShowTodoHint] = useState(false)
-
+  const [swipedTaskId, setSwipedTaskId] = useState<string | null>(null)
 
   async function createTask() {
     if (!newTaskTitle.trim()) {
@@ -172,6 +330,7 @@ const [showSchedule, setShowSchedule] = useState(false)
       .insert({
         user_id: user.id,
         title: newTaskTitle.trim(),
+                life_area: newTaskLifeArea,
         status: newTaskDate ? 'active' : 'inbox',
         type: isEvent ? 'event' : 'task',
         date: newTaskDate || null,
@@ -191,6 +350,7 @@ const [showSchedule, setShowSchedule] = useState(false)
     setNewTaskDate('')
     setNewTaskStartTime('')
     setNewTaskEndTime('')
+        setNewTaskLifeArea(null)
     setShowCreateForm(false)
   }
 
@@ -331,7 +491,8 @@ const [showSchedule, setShowSchedule] = useState(false)
     setSelectedDate(`${year}-${month}-${day}`)
   }
 
-  function toggleTaskDetails(taskId: string) {
+    function toggleTaskDetails(taskId: string) {
+    setSwipedTaskId(null)
     setSelectedTaskId((currentId) =>
       currentId === taskId ? null : taskId
     )
@@ -461,6 +622,12 @@ const [showSchedule, setShowSchedule] = useState(false)
             />
           </label>
         </div>
+                               <LifeAreaPicker
+          value={task.life_area}
+          onChange={(value) => {
+            void updateTask(task.id, { life_area: value })
+          }}
+        />
       </div>
     )
   }
@@ -471,19 +638,92 @@ const [showSchedule, setShowSchedule] = useState(false)
     showDoneCheckbox = true,
         checkboxInside = false,
     toggleDone = false,
+        hideAreaIcon = false,
   }: {
     task: Task
     actions?: ReactNode
     showDoneCheckbox?: boolean
     checkboxInside?: boolean
         toggleDone?: boolean
+            hideAreaIcon?: boolean
   }) {
     const isOpen = selectedTaskId === task.id
     const meta = getTaskMeta(task)
+        const canSwipe = !isOpen && task.status !== 'done'
+    const isSwiped = canSwipe && swipedTaskId === task.id
+    const swipeButtonsCount =
+      1 +
+      (task.status !== 'inbox' ? 1 : 0) +
+      (task.status !== 'idea' ? 1 : 0)
+    const swipeWidth = swipeButtonsCount * SWIPE_BUTTON_WIDTH
 
-    return (
-            <article
-        className={`task-item ${isOpen ? 'is-open' : ''} ${
+    const swipeHandlers = canSwipe
+      ? {
+          onPointerDown: handleSwipeStart,
+          onPointerMove: (event: ReactPointerEvent<HTMLElement>) =>
+            handleSwipeMove(event, swipeWidth, isSwiped),
+          onPointerUp: (event: ReactPointerEvent<HTMLElement>) =>
+            handleSwipeEnd(event, swipeWidth, (open) =>
+              setSwipedTaskId(open ? task.id : null)
+            ),
+          onPointerCancel: (event: ReactPointerEvent<HTMLElement>) =>
+            handleSwipeEnd(event, swipeWidth, (open) =>
+              setSwipedTaskId(open ? task.id : null)
+            ),
+          onPointerLeave: (event: ReactPointerEvent<HTMLElement>) =>
+            handleSwipeEnd(event, swipeWidth, (open) =>
+              setSwipedTaskId(open ? task.id : null)
+            ),
+        }
+      : {}
+        return (
+      <div className="swipe-wrap">
+        {canSwipe && (
+          <div className="swipe-actions" style={{ width: swipeWidth }}>
+            {task.status !== 'inbox' && (
+              <button
+                className="swipe-action swipe-inbox"
+                type="button"
+                onClick={() => {
+                  setSwipedTaskId(null)
+                  void moveToInbox(task)
+                }}
+              >
+                В Inbox
+              </button>
+            )}
+            {task.status !== 'idea' && (
+              <button
+                className="swipe-action swipe-ideas"
+                type="button"
+                onClick={() => {
+                  setSwipedTaskId(null)
+                  void moveToIdeas(task)
+                }}
+              >
+                В Ideas
+              </button>
+            )}
+            <button
+              className="swipe-action swipe-done"
+              type="button"
+              onClick={() => {
+                setSwipedTaskId(null)
+                void moveToDone(task)
+              }}
+            >
+              Готово
+            </button>
+          </div>
+        )}
+      <article
+        {...swipeHandlers}
+        style={
+          isSwiped
+            ? { transform: `translateX(-${swipeWidth}px)` }
+            : undefined
+        }
+        className={`task-item swipe-content ${isOpen ? 'is-open' : ''} ${
           toggleDone && task.status === 'done' ? 'is-completed' : ''
         }`}
       >
@@ -514,11 +754,27 @@ const [showSchedule, setShowSchedule] = useState(false)
           <button
             className="task-summary"
             type="button"
-            onClick={() => toggleTaskDetails(task.id)}
+                        onClick={() => {
+              if (swipeJustHappened) return
+
+              if (isSwiped) {
+                setSwipedTaskId(null)
+                return
+              }
+
+              toggleTaskDetails(task.id)
+            }}
             aria-expanded={isOpen}
           >
-            <span className="task-title">{task.title}</span>
-            {meta && <span className="task-meta">{meta}</span>}
+            <span className="task-title">
+    {task.life_area && !hideAreaIcon && (
+    <LifeAreaIcon area={task.life_area} />
+  )}
+  {task.title}
+</span>
+                        {hideAreaIcon
+              ? task.life_area && <LifeAreaBadge area={task.life_area} />
+              : meta && <span className="task-meta">{meta}</span>}
           </button>
 
                              {checkboxInside && isOpen && (
@@ -561,7 +817,8 @@ const [showSchedule, setShowSchedule] = useState(false)
             )}
           </div>
         )}
-      </article>
+            </article>
+      </div>
     )
   }
 
@@ -676,7 +933,8 @@ const accountInitial = userEmail
     renderActions: (task: Task) => ReactNode,
         emptyText: string,
     showDoneCheckbox = true,
-    toggleDone = false
+    toggleDone = false,
+    hideAreaIcon = false
   ) {
     if (!list.length) {
       return <EmptyState text={emptyText} />
@@ -691,6 +949,7 @@ const accountInitial = userEmail
             actions={renderActions(task)}
             showDoneCheckbox={showDoneCheckbox}
                         toggleDone={toggleDone}
+                                    hideAreaIcon={hideAreaIcon}
           />
         ))}
       </div>
@@ -851,19 +1110,16 @@ const headerNote =
 
         {showSchedule && (
           <div className="creator-schedule">
-            <label className="field-label">
-              Дата
-              <input
-                type="date"
-                value={newTaskDate}
-                onChange={(event) => setNewTaskDate(event.target.value)}
-              />
-            </label>
+                    <LifeAreaPicker
+          value={newTaskLifeArea}
+          onChange={setNewTaskLifeArea}
+        />
 
             <label className="field-label">
               Начало
-              <input
+                          <input
                 type="time"
+                {...pickerProps}
                 value={newTaskStartTime}
                 onChange={(event) =>
                   setNewTaskStartTime(event.target.value)
@@ -875,6 +1131,7 @@ const headerNote =
               Конец
               <input
                 type="time"
+                {...pickerProps}
                 value={newTaskEndTime}
                 onChange={(event) =>
                   setNewTaskEndTime(event.target.value)
@@ -883,6 +1140,12 @@ const headerNote =
             </label>
           </div>
         )}
+
+                <LifeAreaPicker
+          value={newTaskLifeArea}
+          onChange={setNewTaskLifeArea}
+        />
+
 
         <p className="sheet-hint">
           {newTaskDate
@@ -1074,6 +1337,7 @@ const headerNote =
                 </>
               ),
                             'На этот день задач пока нет.',
+              true,
               true,
               true
             )}
