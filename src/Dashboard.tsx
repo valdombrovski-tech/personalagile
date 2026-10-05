@@ -1,19 +1,10 @@
-import {
-  useEffect,
-  useState,
-  type KeyboardEvent,
-  type MouseEvent,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import './App.css'
 import { supabase } from './supabaseClient'
-import { Inbox, Lightbulb, Check } from 'lucide-react'
-import {
-  LifeAreaBadge,
-  LifeAreaIcon,
-  LifeAreaPicker,
-} from './components/LifeArea'
+import { EmptyState } from './components/EmptyState'
+import { LifeAreaPicker } from './components/LifeArea'
+import { TaskCard } from './components/TaskCard'
+import { pickerProps } from './lib/pickerProps'
 import type { LifeArea, Task, View } from './lib/types'
 import { getTaskType } from './lib/tasks'
 import {
@@ -23,90 +14,6 @@ import {
   getTodayString,
   getWeekDays,
 } from './lib/dates'
-
-const pickerProps = {
-  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
-    if (!['Tab', 'Backspace', 'Delete'].includes(event.key)) {
-      event.preventDefault()
-    }
-  },
-  onClick: (event: MouseEvent<HTMLInputElement>) => {
-    try {
-      event.currentTarget.showPicker()
-    } catch {
-      // на iPhone выбор открывается сам при нажатии
-    }
-  },
-}
-
-const SWIPE_BUTTON_WIDTH = 56
-
-let swipeStartX = 0
-let swipeStartY = 0
-let swipeOffset = 0
-let swipeActive = false
-let swipeIsHorizontal = false
-let swipeJustHappened = false
-
-function handleSwipeStart(event: ReactPointerEvent<HTMLElement>) {
-  swipeStartX = event.clientX
-  swipeStartY = event.clientY
-  swipeOffset = 0
-  swipeActive = true
-  swipeIsHorizontal = false
-}
-
-function handleSwipeMove(
-  event: ReactPointerEvent<HTMLElement>,
-  width: number,
-  isSwiped: boolean
-) {
-  if (!swipeActive) return
-
-  const dx = event.clientX - swipeStartX
-  const dy = event.clientY - swipeStartY
-
-  if (!swipeIsHorizontal) {
-    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
-
-    if (Math.abs(dy) > Math.abs(dx)) {
-      swipeActive = false
-      return
-    }
-
-    swipeIsHorizontal = true
-  }
-
-  const base = isSwiped ? -width : 0
-  swipeOffset = Math.max(-width, Math.min(0, base + dx))
-
-  const element = event.currentTarget
-  element.style.transition = 'none'
-  element.style.transform = `translateX(${swipeOffset}px)`
-}
-
-function handleSwipeEnd(
-  event: ReactPointerEvent<HTMLElement>,
-  width: number,
-  onResult: (isOpen: boolean) => void
-) {
-  if (!swipeActive) return
-
-  swipeActive = false
-
-  if (!swipeIsHorizontal) return
-
-  swipeJustHappened = true
-  window.setTimeout(() => {
-    swipeJustHappened = false
-  }, 50)
-
-  const element = event.currentTarget
-  element.style.transition = ''
-  element.style.transform = ''
-
-  onResult(swipeOffset < -width / 2)
-}
 
 const AFFIRMATIONS = [
   'Хороший день для больших дел',
@@ -328,331 +235,18 @@ function Dashboard() {
     return titles[view]
   }
 
-  function getTaskMeta(task: Task) {
-    const parts: string[] = []
-
-    if (task.date) {
-      parts.push(
-        new Date(`${task.date}T00:00:00`).toLocaleDateString('ru-RU', {
-          day: 'numeric',
-          month: 'short',
-        })
-      )
+  function getCardProps(task: Task) {
+    return {
+      task,
+      isOpen: selectedTaskId === task.id,
+      isSwiped: swipedTaskId === task.id,
+      onToggleDetails: toggleTaskDetails,
+      onSwipeChange: setSwipedTaskId,
+      onUpdate: updateTask,
+      onMoveToInbox: moveToInbox,
+      onMoveToIdeas: moveToIdeas,
+      onMoveToDone: moveToDone,
     }
-
-    if (task.start_time) {
-      const time = task.end_time
-        ? `${formatTime(task.start_time)}–${formatTime(task.end_time)}`
-        : formatTime(task.start_time)
-
-      parts.push(time)
-    }
-
-    if (task.type === 'event') {
-      parts.push('Событие')
-    }
-
-    return parts.join(' · ')
-  }
-
-  function TaskDetails({ task }: { task: Task }) {
-    return (
-      <div className="task-details">
-        <label className="field-label">
-          Название
-          <input
-            type="text"
-            defaultValue={task.title}
-            onBlur={(event) => {
-              const newTitle = event.target.value.trim()
-
-              if (!newTitle || newTitle === task.title) {
-                event.target.value = task.title
-                return
-              }
-
-              void updateTask(task.id, { title: newTitle })
-            }}
-          />
-        </label>
-
-        <label className="field-label">
-          Описание
-          <textarea
-            defaultValue={task.description ?? ''}
-            placeholder="Добавьте описание"
-            onBlur={(event) => {
-              const newDescription = event.target.value.trim()
-
-              void updateTask(task.id, {
-                description: newDescription || null,
-              })
-            }}
-          />
-        </label>
-
-        <div className="task-date-fields">
-          <label className="field-label">
-            Дата
-            <input
-              type="date"
-              {...pickerProps}
-              value={task.date ?? ''}
-              onChange={(event) => {
-                const newDate = event.target.value || null
-
-                void updateTask(task.id, {
-                  date: newDate,
-                  type: getTaskType(newDate, task.start_time),
-                })
-              }}
-            />
-          </label>
-
-          <label className="field-label">
-            Начало
-            <input
-              type="time"
-              {...pickerProps}
-              value={formatTime(task.start_time)}
-              onChange={(event) => {
-                const newStartTime = event.target.value || null
-
-                void updateTask(task.id, {
-                  start_time: newStartTime,
-                  type: getTaskType(task.date, newStartTime),
-                })
-              }}
-            />
-          </label>
-
-          <label className="field-label">
-            Конец
-            <input
-              type="time"
-              {...pickerProps}
-              value={formatTime(task.end_time)}
-              onChange={(event) => {
-                void updateTask(task.id, {
-                  end_time: event.target.value || null,
-                })
-              }}
-            />
-          </label>
-        </div>
-
-        <LifeAreaPicker
-          value={task.life_area}
-          onChange={(value) => {
-            void updateTask(task.id, { life_area: value })
-          }}
-        />
-      </div>
-    )
-  }
-
-  function TaskCard({
-    task,
-    actions,
-    showDoneCheckbox = true,
-    checkboxInside = false,
-    toggleDone = false,
-    hideAreaIcon = false,
-  }: {
-    task: Task
-    actions?: ReactNode
-    showDoneCheckbox?: boolean
-    checkboxInside?: boolean
-    toggleDone?: boolean
-    hideAreaIcon?: boolean
-  }) {
-    const isOpen = selectedTaskId === task.id
-    const meta = getTaskMeta(task)
-    const canSwipe = !isOpen && task.status !== 'done'
-    const isSwiped = canSwipe && swipedTaskId === task.id
-    const swipeButtonsCount =
-      1 +
-      (task.status !== 'inbox' ? 1 : 0) +
-      (task.status !== 'idea' ? 1 : 0)
-    const swipeWidth = swipeButtonsCount * SWIPE_BUTTON_WIDTH
-
-    const swipeHandlers = canSwipe
-      ? {
-          onPointerDown: handleSwipeStart,
-          onPointerMove: (event: ReactPointerEvent<HTMLElement>) =>
-            handleSwipeMove(event, swipeWidth, isSwiped),
-          onPointerUp: (event: ReactPointerEvent<HTMLElement>) =>
-            handleSwipeEnd(event, swipeWidth, (open) =>
-              setSwipedTaskId(open ? task.id : null)
-            ),
-          onPointerCancel: (event: ReactPointerEvent<HTMLElement>) =>
-            handleSwipeEnd(event, swipeWidth, (open) =>
-              setSwipedTaskId(open ? task.id : null)
-            ),
-          onPointerLeave: (event: ReactPointerEvent<HTMLElement>) =>
-            handleSwipeEnd(event, swipeWidth, (open) =>
-              setSwipedTaskId(open ? task.id : null)
-            ),
-        }
-      : {}
-
-    return (
-      <div className="swipe-wrap">
-        {canSwipe && (
-          <div className="swipe-actions" style={{ width: swipeWidth }}>
-            {task.status !== 'inbox' && (
-              <button
-                className="swipe-action swipe-inbox"
-                type="button"
-                aria-label="В Inbox"
-                title="В Inbox"
-                onClick={() => {
-                  setSwipedTaskId(null)
-                  void moveToInbox(task)
-                }}
-              >
-                <Inbox size={20} />
-              </button>
-            )}
-            {task.status !== 'idea' && (
-              <button
-                className="swipe-action swipe-ideas"
-                type="button"
-                aria-label="В Ideas"
-                title="В Ideas"
-                onClick={() => {
-                  setSwipedTaskId(null)
-                  void moveToIdeas(task)
-                }}
-              >
-                <Lightbulb size={20} />
-              </button>
-            )}
-            <button
-              className="swipe-action swipe-done"
-              type="button"
-              aria-label="Готово"
-              title="Готово"
-              onClick={() => {
-                setSwipedTaskId(null)
-                void moveToDone(task)
-              }}
-            >
-              <Check size={20} />
-            </button>
-          </div>
-        )}
-
-        <article
-          {...swipeHandlers}
-          style={
-            isSwiped
-              ? { transform: `translateX(-${swipeWidth}px)` }
-              : undefined
-          }
-          className={`task-item swipe-content ${isOpen ? 'is-open' : ''} ${
-            toggleDone && task.status === 'done' ? 'is-completed' : ''
-          }`}
-        >
-          <div className="task-item-main">
-            {checkboxInside ? null : showDoneCheckbox ? (
-              <input
-                className="task-checkbox"
-                type="checkbox"
-                checked={toggleDone ? task.status === 'done' : undefined}
-                aria-label={`Завершить задачу «${task.title}»`}
-                onChange={() => {
-                  if (toggleDone) {
-                    void updateTask(task.id, {
-                      status: task.status === 'done' ? 'active' : 'done',
-                    })
-                    return
-                  }
-
-                  window.setTimeout(() => void moveToDone(task), 350)
-                }}
-              />
-            ) : (
-              <span className="task-status-dot" aria-hidden="true">
-                ✓
-              </span>
-            )}
-
-            <button
-              className="task-summary"
-              type="button"
-              onClick={() => {
-                if (swipeJustHappened) return
-
-                if (isSwiped) {
-                  setSwipedTaskId(null)
-                  return
-                }
-
-                toggleTaskDetails(task.id)
-              }}
-              aria-expanded={isOpen}
-            >
-              <span className="task-title">
-                {task.life_area && !hideAreaIcon && (
-                  <LifeAreaIcon area={task.life_area} />
-                )}
-                {task.title}
-              </span>
-              {hideAreaIcon
-                ? task.life_area && <LifeAreaBadge area={task.life_area} />
-                : meta && <span className="task-meta">{meta}</span>}
-            </button>
-
-            {checkboxInside && isOpen && (
-              <button
-                className={`complete-button ${
-                  task.status === 'done' ? 'is-done' : ''
-                }`}
-                type="button"
-                onClick={() =>
-                  task.status === 'done'
-                    ? void updateTask(task.id, { status: 'active' })
-                    : void moveToDone(task)
-                }
-              >
-                <span className="complete-circle" aria-hidden="true" />
-                {task.status === 'done' ? 'Завершено' : 'Завершить'}
-              </button>
-            )}
-
-            <button
-              className="task-expand-button"
-              type="button"
-              onClick={() => toggleTaskDetails(task.id)}
-              aria-label={
-                isOpen
-                  ? `Свернуть задачу «${task.title}»`
-                  : `Открыть задачу «${task.title}»`
-              }
-            >
-              <span className="expand-chevron" aria-hidden="true" />
-            </button>
-          </div>
-
-          {isOpen && (
-            <div className="task-item-expanded">
-              <TaskDetails task={task} />
-              {actions && <div className="task-actions">{actions}</div>}
-            </div>
-          )}
-        </article>
-      </div>
-    )
-  }
-
-  function EmptyState({ text }: { text: string }) {
-    return (
-      <div className="empty-state">
-        <span className="empty-state-icon">✓</span>
-        <p>{text}</p>
-      </div>
-    )
   }
 
   const todayEvents = tasks
@@ -762,7 +356,7 @@ function Dashboard() {
         {list.map((task) => (
           <TaskCard
             key={task.id}
-            task={task}
+            {...getCardProps(task)}
             actions={renderActions(task)}
             showDoneCheckbox={showDoneCheckbox}
             toggleDone={toggleDone}
@@ -798,7 +392,7 @@ function Dashboard() {
                 {task.end_time ? ` – ${formatTime(task.end_time)}` : ''}
               </p>
               <TaskCard
-                task={task}
+                {...getCardProps(task)}
                 actions={renderActions(task)}
                 checkboxInside
               />
