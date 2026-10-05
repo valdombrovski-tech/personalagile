@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
+import { DirectPreview } from '../components/DirectPreview'
+import { UserSearchSheet } from '../components/UserSearchSheet'
 import { TaskList } from '../components/TaskList'
 import type { TaskActions, TaskSelection } from '../lib/taskViewTypes'
 import type { Task } from '../lib/types'
@@ -31,28 +34,59 @@ function ListSection({
 }
 
 export function InboxView({ tasks, selection, actions }: ListViewProps) {
+  const [isDirectNoticeVisible, setIsDirectNoticeVisible] = useState(false)
+const [isUserSearchOpen, setIsUserSearchOpen] = useState(false)
+
+  function openUserSearch() {
+  setIsDirectNoticeVisible(false)
+  setIsUserSearchOpen(true)
+}
+
   return (
-    <ListSection title="Входящие" count={tasks.length}>
-      <TaskList
-        tasks={tasks}
-        selection={selection}
-        actions={actions}
-        emptyText="Inbox пуст. Добавьте первую задачу."
-        renderActions={(task) => (
-          <>
-            <button type="button" onClick={() => void actions.moveToInProgress(task)}>
-              В работу
-            </button>
-            <button type="button" onClick={() => void actions.moveToIdeas(task)}>
-              В идеи
-            </button>
-            <button type="button" onClick={() => void actions.moveToDone(task)}>
-              Готово
-            </button>
-          </>
-        )}
-      />
-    </ListSection>
+    <>
+      <DirectPreview onFindUser={openUserSearch} />
+
+      {isUserSearchOpen && (
+  <UserSearchSheet onClose={() => setIsUserSearchOpen(false)} />
+)}
+
+      {isDirectNoticeVisible && (
+        <p className="direct-notice" role="status">
+          Поиск пользователей появится на следующем шаге.
+        </p>
+      )}
+
+      <ListSection title="Мои задачи" count={tasks.length}>
+        <TaskList
+          tasks={tasks}
+          selection={selection}
+          actions={actions}
+          emptyText="Inbox пуст. Добавьте первую задачу."
+          renderActions={(task) => (
+            <>
+              <button
+                type="button"
+                onClick={() => void actions.moveToInProgress(task)}
+              >
+                В работу
+              </button>
+              <button
+                type="button"
+                onClick={() => void actions.moveToIdeas(task)}
+              >
+                В идеи
+              </button>
+              <button
+                type="button"
+                onClick={() => void actions.moveToDone(task)}
+              >
+                Готово
+              </button>
+            </>
+          )}
+        />
+      </ListSection>
+    </>
   )
 }
 

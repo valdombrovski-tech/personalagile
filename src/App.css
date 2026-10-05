@@ -1594,3 +1594,275 @@ input[type="checkbox"] {
   min-width: 0;
   flex: 1;
 }
+
+.username-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.username-input-wrap span {
+  color: #727272;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.username-input-wrap input {
+  flex: 1;
+}
+
+.form-error {
+  margin: 0;
+  color: #c43b3b;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.direct-preview {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid rgba(27, 45, 72, 0.08);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(28, 43, 71, 0.05);
+}
+
+.direct-preview-header,
+.direct-preview-title,
+.direct-empty-state {
+  display: flex;
+  align-items: center;
+}
+
+.direct-preview-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.direct-preview-title {
+  min-width: 0;
+  gap: 10px;
+}
+
+.direct-preview-icon,
+.direct-empty-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: #285cc4;
+  background: #edf3ff;
+}
+
+.direct-preview-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.direct-preview-title h2,
+.direct-empty-state h3,
+.direct-preview-title p,
+.direct-empty-state p {
+  margin: 0;
+}
+
+.direct-preview-title h2 {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.direct-preview-title p {
+  margin-top: 2px;
+  color: #7a808d;
+  font-size: 12px;
+}
+
+.direct-search-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #285cc4;
+  background: #edf3ff;
+  cursor: pointer;
+}
+
+.direct-empty-state {
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.direct-empty-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.direct-empty-state h3 {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.direct-empty-state p {
+  margin-top: 4px;
+  color: #6d7380;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.direct-find-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid #d6e1f8;
+  border-radius: 13px;
+  color: #285cc4;
+  background: #f4f7ff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.direct-find-button:hover,
+.direct-search-button:hover {
+  background: #e6efff;
+}
+
+.direct-notice {
+  margin: -14px 0 20px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: #285cc4;
+  background: #edf3ff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.user-search-sheet {
+  min-height: min(62vh, 540px);
+}
+
+.user-search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 4px 0 16px;
+  padding: 0 13px;
+  border: 1px solid #dbe2ed;
+  border-radius: 14px;
+  color: #727b88;
+  background: #f8fafc;
+}
+
+.user-search-input-wrap input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: #1d2736;
+  background: transparent;
+  font: inherit;
+}
+
+.user-search-content {
+  min-height: 230px;
+}
+
+.user-search-placeholder {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 190px;
+  padding: 24px;
+  border-radius: 16px;
+  color: #7a8492;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.user-search-placeholder p,
+.user-search-status {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.user-search-status {
+  padding: 12px 0;
+  color: #727b88;
+}
+
+.user-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.user-search-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.user-search-avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: #285cc4;
+  background: #e7efff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.user-search-profile {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  flex: 1;
+}
+
+.user-search-profile strong,
+.user-search-profile span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-search-profile strong {
+  color: #1d2736;
+  font-size: 14px;
+}
+
+.user-search-profile span {
+  color: #7a8492;
+  font-size: 13px;
+}
+
+.user-search-add-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #d4e0f8;
+  border-radius: 10px;
+  color: #285cc4;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
