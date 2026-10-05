@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react'
 import './App.css'
 import { supabase } from './supabaseClient'
 
 type Task = {
   id: string
+  user_id: string
   title: string
   description: string | null
   date: string | null
@@ -12,6 +19,8 @@ type Task = {
   start_time: string | null
   end_time: string | null
 }
+
+type View = 'today' | 'inbox' | 'in-progress' | 'ideas' | 'done'
 
 function getTodayString() {
   const now = new Date()
@@ -29,47 +38,145 @@ function getTaskType(
   return date && startTime ? 'event' : 'task'
 }
 
+function formatTime(time: string | null) {
+  return time ? time.slice(0, 5) : ''
+}
+
+const pickerProps = {
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!['Tab', 'Backspace', 'Delete'].includes(event.key)) {
+      event.preventDefault()
+    }
+  },
+  onClick: (event: MouseEvent<HTMLInputElement>) => {
+    try {
+      event.currentTarget.showPicker()
+    } catch {
+      // на iPhone выбор открывается сам при нажатии
+    }
+  },
+}
+
+function formatSelectedDate(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+const AFFIRMATIONS = [
+  'Хороший день для больших дел',
+  'Маленькие шаги ведут далеко',
+  'Спокойно, по одному делу за раз',
+  'Главное — начать',
+  'Сегодня ты на правильном пути',
+  'Фокус на главном',
+  'Ты справишься шаг за шагом',
+  'Время делать важное',
+]
+
+function getAffirmation() {
+  const now = new Date()
+  const dayNumber = Math.floor(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() /
+      86400000
+  )
+
+  return AFFIRMATIONS[dayNumber % AFFIRMATIONS.length]
+}
+
+function toDateString(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function getWeekDays(dateString: string) {
+  const date = new Date(`${dateString}T00:00:00`)
+  const dayOfWeek = (date.getDay() + 6) % 7
+  const monday = new Date(date)
+  monday.setDate(date.getDate() - dayOfWeek)
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + index)
+
+    return toDateString(day)
+  })
+}
+
+function getDayOffset(dateString: string) {
+  const selected = new Date(`${dateString}T00:00:00`)
+  const today = new Date(`${getTodayString()}T00:00:00`)
+
+  return Math.round(
+    (selected.getTime() - today.getTime()) / 86400000
+  )
+}
+
+function getRelativeDayLabel(dateString: string) {
+  const offset = getDayOffset(dateString)
+
+  if (offset === -2) return 'Позавчера'
+  if (offset === -1) return 'Вчера'
+  if (offset === 0) return 'Сегодня'
+  if (offset === 1) return 'Завтра'
+  if (offset === 2) return 'Послезавтра'
+
+  return null
+}
 
 function Dashboard() {
+  const [userEmail, setUserEmail] = useState('')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskStartTime, setNewTaskStartTime] = useState('')
   const [newTaskEndTime, setNewTaskEndTime] = useState('')
-
   const [tasks, setTasks] = useState<Task[]>([])
+  const [view, setView] = useState<View>('today')
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState(getTodayString())
+  const [showCreateForm, setShowCreateForm] = useState(false)
+const [showSchedule, setShowSchedule] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+    const [now, setNow] = useState(() => new Date())
+      const [showEventsHint, setShowEventsHint] = useState(false)
+  const [showTodoHint, setShowTodoHint] = useState(false)
 
-  const [view, setView] = useState<
-    'today' | 'inbox' | 'in-progress' | 'ideas' | 'done'
-  >('today')
-
-  const [selectedTaskId, setSelectedTaskId] =
-    useState<string | null>(null)
-
-  const [selectedDate, setSelectedDate] =
-    useState(getTodayString())
 
   async function createTask() {
     if (!newTaskTitle.trim()) {
       return
     }
 
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      console.error(
+        'Не удалось получить текущего пользователя:',
+        userError
+      )
+      return
+    }
+
     const isEvent =
-      Boolean(newTaskDate) &&
-      Boolean(newTaskStartTime)
+      Boolean(newTaskDate) && Boolean(newTaskStartTime)
 
     const { data, error } = await supabase
       .from('tasks')
       .insert({
+        user_id: user.id,
         title: newTaskTitle.trim(),
         status: newTaskDate ? 'active' : 'inbox',
         type: isEvent ? 'event' : 'task',
         date: newTaskDate || null,
-        start_time: isEvent
-          ? newTaskStartTime
-          : null,
-        end_time: isEvent
-          ? newTaskEndTime || null
-          : null,
+        start_time: isEvent ? newTaskStartTime : null,
+        end_time: isEvent ? newTaskEndTime || null : null,
       })
       .select()
       .single()
@@ -79,15 +186,12 @@ function Dashboard() {
       return
     }
 
-    setTasks((currentTasks) => [
-      ...currentTasks,
-      data,
-    ])
-
+    setTasks((currentTasks) => [...currentTasks, data as Task])
     setNewTaskTitle('')
     setNewTaskDate('')
     setNewTaskStartTime('')
     setNewTaskEndTime('')
+    setShowCreateForm(false)
   }
 
   async function updateTask(
@@ -108,7 +212,7 @@ function Dashboard() {
 
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
-        task.id === taskId ? data : task
+        task.id === taskId ? (data as Task) : task
       )
     )
   }
@@ -116,15 +220,10 @@ function Dashboard() {
   async function moveToInProgress(task: Task) {
     const date = task.date || getTodayString()
 
-    const type = getTaskType(
-      date,
-      task.start_time
-    )
-
     await updateTask(task.id, {
       status: 'active',
       date,
-      type,
+      type: getTaskType(date, task.start_time),
     })
   }
 
@@ -140,10 +239,20 @@ function Dashboard() {
     })
   }
 
-  async function moveToDone(task: Task) {
+    async function moveToDone(task: Task) {
     await updateTask(task.id, {
       status: 'done',
     })
+  }
+
+  async function moveToToday(task: Task) {
+    await updateTask(task.id, {
+      date: getTodayString(),
+    })
+  }
+
+  async function moveAllToToday(list: Task[]) {
+    await Promise.all(list.map((task) => moveToToday(task)))
   }
 
   async function deleteTask(taskId: string) {
@@ -158,9 +267,7 @@ function Dashboard() {
     }
 
     setTasks((currentTasks) =>
-      currentTasks.filter(
-        (task) => task.id !== taskId
-      )
+      currentTasks.filter((task) => task.id !== taskId)
     )
 
     if (selectedTaskId === taskId) {
@@ -169,1231 +276,1069 @@ function Dashboard() {
   }
 
   useEffect(() => {
-    let timeoutId: number
+    let isMounted = true
 
     async function loadTasks() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        return
+      }
+
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .eq('user_id', user.id)
 
       if (error) {
         console.error('Supabase error:', error)
         return
       }
 
-      const today = getTodayString()
+      if (!isMounted) {
+        return
+      }
 
-      const updatedTasks = await Promise.all(
-        data.map(async (task: Task) => {
-          if (
-            task.type === 'task' &&
-            task.status === 'active' &&
-            task.date &&
-            task.date < today
-          ) {
-            const {
-              data: updatedTask,
-              error: updateError,
-            } = await supabase
-              .from('tasks')
-              .update({
-                date: today,
-              })
-              .eq('id', task.id)
-              .select()
-              .single()
-
-            if (updateError) {
-              console.error(
-                'Supabase error:',
-                updateError
-              )
-              return task
-            }
-
-            return updatedTask
-          }
-
-          return task
-        })
-      )
-
-      setTasks(updatedTasks)
+      setUserEmail(user.email ?? '')
+      setTasks((data ?? []) as Task[])
     }
 
-    async function checkNextDay() {
-      await loadTasks()
-
-      const now = new Date()
-      const nextDay = new Date(now)
-
-      nextDay.setHours(24, 0, 0, 0)
-
-      const delay =
-        nextDay.getTime() -
-        now.getTime() +
-        1000
-
-      timeoutId = window.setTimeout(
-        checkNextDay,
-        delay
-      )
-    }
-
-    loadTasks()
-    checkNextDay()
+    void loadTasks()
 
     return () => {
-      window.clearTimeout(timeoutId)
+      isMounted = false
     }
   }, [])
 
-  function changeSelectedDate(days: number) {
-    const date = new Date(
-      `${selectedDate}T00:00:00`
-    )
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(new Date()), 30000)
 
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  function changeSelectedDate(days: number) {
+    const date = new Date(`${selectedDate}T00:00:00`)
     date.setDate(date.getDate() + days)
 
-    const year = date.getFullYear()
-    const month = String(
-      date.getMonth() + 1
-    ).padStart(2, '0')
-    const day = String(
-      date.getDate()
-    ).padStart(2, '0')
 
-    setSelectedDate(
-      `${year}-${month}-${day}`
+
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+
+    setSelectedDate(`${year}-${month}-${day}`)
+  }
+
+  function toggleTaskDetails(taskId: string) {
+    setSelectedTaskId((currentId) =>
+      currentId === taskId ? null : taskId
     )
   }
 
-  return (
-    <div className="dashboard">
-      <h1>Personal Agile</h1>
+  function getViewTitle() {
+    const titles: Record<View, string> = {
+      today: 'Сегодня',
+      inbox: 'Входящие',
+      'in-progress': 'В работе',
+      ideas: 'Идеи',
+      done: 'Готово',
+    }
 
-      <input
-        type="text"
-        placeholder="Новая задача"
-        value={newTaskTitle}
-        onChange={(event) =>
-          setNewTaskTitle(event.target.value)
-        }
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            createTask()
-          }
-        }}
-      />
+    return titles[view]
+  }
 
-      <input
-        type="date"
-        value={newTaskDate}
-        onChange={(event) =>
-          setNewTaskDate(event.target.value)
-        }
-      />
+  function getTaskMeta(task: Task) {
+    const parts: string[] = []
 
-      <input
-        type="time"
-        value={newTaskStartTime}
-        onChange={(event) =>
-          setNewTaskStartTime(
-            event.target.value
-          )
-        }
-      />
-
-      <input
-        type="time"
-        value={newTaskEndTime}
-        onChange={(event) =>
-          setNewTaskEndTime(
-            event.target.value
-          )
-        }
-      />
-
-      <button onClick={createTask}>
-        Добавить
-      </button>
-
-      <h2>
-        {new Date(
-          `${selectedDate}T00:00:00`
-        ).toLocaleDateString('ru-RU', {
+    if (task.date) {
+      parts.push(
+        new Date(`${task.date}T00:00:00`).toLocaleDateString('ru-RU', {
           day: 'numeric',
-          month: 'long',
+          month: 'short',
+        })
+      )
+    }
+
+    if (task.start_time) {
+      const time = task.end_time
+        ? `${formatTime(task.start_time)}–${formatTime(task.end_time)}`
+        : formatTime(task.start_time)
+
+      parts.push(time)
+    }
+
+    if (task.type === 'event') {
+      parts.push('Событие')
+    }
+
+    return parts.join(' · ')
+  }
+
+  function TaskDetails({ task }: { task: Task }) {
+    return (
+      <div className="task-details">
+        <label className="field-label">
+          Название
+          <input
+            type="text"
+            defaultValue={task.title}
+            onBlur={(event) => {
+              const newTitle = event.target.value.trim()
+
+              if (!newTitle || newTitle === task.title) {
+                event.target.value = task.title
+                return
+              }
+
+              void updateTask(task.id, { title: newTitle })
+            }}
+          />
+        </label>
+
+                <label className="field-label">
+          Описание
+          <textarea
+            defaultValue={task.description ?? ''}
+            placeholder="Добавьте описание"
+            onBlur={(event) => {
+              const newDescription = event.target.value.trim()
+
+              void updateTask(task.id, {
+                description: newDescription || null,
+              })
+            }}
+          />
+        </label>
+
+        <div className="task-date-fields">
+          <label className="field-label">
+            Дата
+            <input
+              type="date"
+              {...pickerProps}
+              value={task.date ?? ''}
+              onChange={(event) => {
+                const newDate = event.target.value || null
+
+                void updateTask(task.id, {
+                  date: newDate,
+                  type: getTaskType(newDate, task.start_time),
+                })
+              }}
+            />
+          </label>
+
+          <label className="field-label">
+            Начало
+            <input
+              type="time"
+              {...pickerProps}
+              value={formatTime(task.start_time)}
+              onChange={(event) => {
+                const newStartTime = event.target.value || null
+
+                void updateTask(task.id, {
+                  start_time: newStartTime,
+                  type: getTaskType(task.date, newStartTime),
+                })
+              }}
+            />
+          </label>
+
+          <label className="field-label">
+            Конец
+            <input
+              type="time"
+              {...pickerProps}
+              value={formatTime(task.end_time)}
+              onChange={(event) => {
+                void updateTask(task.id, {
+                  end_time: event.target.value || null,
+                })
+              }}
+            />
+          </label>
+        </div>
+      </div>
+    )
+  }
+
+    function TaskCard({
+    task,
+    actions,
+    showDoneCheckbox = true,
+        checkboxInside = false,
+    toggleDone = false,
+  }: {
+    task: Task
+    actions?: ReactNode
+    showDoneCheckbox?: boolean
+    checkboxInside?: boolean
+        toggleDone?: boolean
+  }) {
+    const isOpen = selectedTaskId === task.id
+    const meta = getTaskMeta(task)
+
+    return (
+            <article
+        className={`task-item ${isOpen ? 'is-open' : ''} ${
+          toggleDone && task.status === 'done' ? 'is-completed' : ''
+        }`}
+      >
+        <div className="task-item-main">
+                    {checkboxInside ? null : showDoneCheckbox ? (
+                        <input
+              className="task-checkbox"
+              type="checkbox"
+              checked={toggleDone ? task.status === 'done' : undefined}
+              aria-label={`Завершить задачу «${task.title}»`}
+              onChange={() => {
+                if (toggleDone) {
+                  void updateTask(task.id, {
+                    status: task.status === 'done' ? 'active' : 'done',
+                  })
+                  return
+                }
+
+                window.setTimeout(() => void moveToDone(task), 350)
+              }}
+            />
+          ) : (
+            <span className="task-status-dot" aria-hidden="true">
+              ✓
+            </span>
+          )}
+
+          <button
+            className="task-summary"
+            type="button"
+            onClick={() => toggleTaskDetails(task.id)}
+            aria-expanded={isOpen}
+          >
+            <span className="task-title">{task.title}</span>
+            {meta && <span className="task-meta">{meta}</span>}
+          </button>
+
+                             {checkboxInside && isOpen && (
+            <button
+              className={`complete-button ${
+                task.status === 'done' ? 'is-done' : ''
+              }`}
+              type="button"
+              onClick={() =>
+                task.status === 'done'
+                  ? void updateTask(task.id, { status: 'active' })
+                  : void moveToDone(task)
+              }
+            >
+              <span className="complete-circle" aria-hidden="true" />
+              {task.status === 'done' ? 'Завершено' : 'Завершить'}
+            </button>
+          )}
+
+
+          <button
+            className="task-expand-button"
+            type="button"
+            onClick={() => toggleTaskDetails(task.id)}
+            aria-label={
+              isOpen
+                ? `Свернуть задачу «${task.title}»`
+                : `Открыть задачу «${task.title}»`
+            }
+          >
+                       <span className="expand-chevron" aria-hidden="true" />
+          </button>
+        </div>
+
+        {isOpen && (
+          <div className="task-item-expanded">
+                        <TaskDetails task={task} />
+            {actions && (
+              <div className="task-actions">{actions}</div>
+            )}
+          </div>
+        )}
+      </article>
+    )
+  }
+
+  function EmptyState({ text }: { text: string }) {
+    return (
+      <div className="empty-state">
+        <span className="empty-state-icon">✓</span>
+        <p>{text}</p>
+      </div>
+    )
+  }
+
+  const todayEvents = tasks
+    .filter(
+      (task) =>
+              (task.status === 'active' || task.status === 'done') &&
+        task.type === 'event' &&
+        task.date === selectedDate
+    )
+    .sort((a, b) =>
+      (a.start_time ?? '').localeCompare(b.start_time ?? '')
+    )
+
+    const todayTasks = tasks
+    .filter(
+      (task) =>
+        (task.status === 'active' || task.status === 'done') &&
+        task.type === 'task' &&
+        task.date === selectedDate
+    )
+    .sort(
+      (a, b) =>
+        Number(a.status === 'done') - Number(b.status === 'done')
+    )
+
+    function isEventPast(task: Task, index: number) {
+    if (task.status === 'done') return true
+    if (!task.date) return false
+
+    const today = getTodayString()
+
+    if (task.date < today) return true
+    if (task.date > today) return false
+
+    const nowTime = now.toTimeString().slice(0, 5)
+
+    if (task.end_time && nowTime >= formatTime(task.end_time)) {
+      return true
+    }
+
+    const nextEvent = todayEvents
+      .slice(index + 1)
+      .find(
+        (event) =>
+          event.start_time &&
+          formatTime(event.start_time) > formatTime(task.start_time)
+      )
+
+    return Boolean(
+      nextEvent && nowTime >= formatTime(nextEvent.start_time)
+    )
+  }
+
+  const inboxTasks = tasks.filter((task) => task.status === 'inbox')
+  const ideaTasks = tasks.filter((task) => task.status === 'idea')
+  const inProgressTasks = tasks.filter((task) => task.status === 'active')
+  const doneTasks = tasks.filter((task) => task.status === 'done')
+const todayString = getTodayString()
+const weekDays = getWeekDays(selectedDate)
+
+const relativeDayLabel = getRelativeDayLabel(selectedDate)
+
+const headerTitle =
+  view === 'today'
+    ? relativeDayLabel
+      ? `${relativeDayLabel}, ${formatSelectedDate(selectedDate)}`
+      : formatSelectedDate(selectedDate)
+    : getViewTitle()
+
+const headerOverdueCount =
+  selectedDate === getTodayString()
+    ? tasks.filter(
+        (task) =>
+          task.status === 'active' &&
+          task.type === 'task' &&
+          task.date !== null &&
+          task.date < getTodayString()
+      ).length
+    : 0
+
+const headerCount =
+  view === 'today'
+        ? todayEvents.filter((task) => task.status === 'active').length +
+            todayTasks.filter((task) => task.status === 'active').length +
+      headerOverdueCount
+    : view === 'inbox'
+      ? inboxTasks.length
+      : view === 'ideas'
+        ? ideaTasks.length
+        : view === 'in-progress'
+          ? inProgressTasks.length
+          : doneTasks.length
+
+const headerCountLabel =
+  view === 'today' ? 'Запланировано' : 'Задач'
+
+const accountInitial = userEmail
+  ? userEmail.charAt(0).toUpperCase()
+  : '·'
+  function renderTaskList(
+    list: Task[],
+    renderActions: (task: Task) => ReactNode,
+        emptyText: string,
+    showDoneCheckbox = true,
+    toggleDone = false
+  ) {
+    if (!list.length) {
+      return <EmptyState text={emptyText} />
+    }
+
+    return (
+      <div className="task-list">
+        {list.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            actions={renderActions(task)}
+            showDoneCheckbox={showDoneCheckbox}
+                        toggleDone={toggleDone}
+          />
+        ))}
+      </div>
+    )
+  }
+
+    function renderEventTimeline(
+    list: Task[],
+    renderActions: (task: Task) => ReactNode,
+    emptyText: string
+  ) {
+    if (!list.length) {
+      return <EmptyState text={emptyText} />
+    }
+
+    return (
+            <div className="timeline">
+        {list.map((task, index) => {
+          const isPast = isEventPast(task, index)
+
+          return (
+            <div
+              className={`timeline-item ${isPast ? 'is-past' : ''}`}
+              key={task.id}
+            >
+              <span className="timeline-dot" aria-hidden="true" />
+              <p className="timeline-time">
+                {formatTime(task.start_time)}
+                {task.end_time ? ` – ${formatTime(task.end_time)}` : ''}
+              </p>
+              <TaskCard
+                task={task}
+                actions={renderActions(task)}
+                checkboxInside
+              />
+            </div>
+          )
         })}
-      </h2>
+      </div>
+    )
+  }
+
+const headerTitleParts = headerTitle.split(', ')
+
+const headerNote =
+  view === 'today'
+    ? getAffirmation()
+    : `${headerCountLabel}: ${headerCount}`
+
+  return (
+    <main className="dashboard">
+      <header className="dashboard-header">
+  <div className="header-copy">
+    <h1>
+      {headerTitleParts.map((part, index) => (
+        <span className="title-line" key={part}>
+          {part}
+          {index < headerTitleParts.length - 1 ? ',' : ''}
+        </span>
+      ))}
+    </h1>
+
+    <div className="header-note">
+      <p className="header-subtitle">{headerNote}</p>
 
       <button
-        onClick={() => changeSelectedDate(-1)}
+        className="header-add-button"
+        type="button"
+        aria-label="Создать задачу"
+        onClick={() => setShowCreateForm(true)}
       >
-        Previous
+        +
       </button>
+    </div>
+  </div>
 
-      <button
-        onClick={() => changeSelectedDate(1)}
-      >
-        Next
-      </button>
+  <div className="account-menu">
+    <button
+      className="account-menu-trigger"
+      type="button"
+      aria-label="Открыть меню профиля"
+      aria-expanded={isAccountMenuOpen}
+      onClick={() =>
+        setIsAccountMenuOpen((current) => !current)
+      }
+    >
+      {accountInitial}
+    </button>
+
+    {isAccountMenuOpen && (
+      <div className="account-menu-panel">
+        <p className="account-email">
+          {userEmail || 'Загрузка профиля…'}
+        </p>
+
+        <button
+          className="logout-button"
+          type="button"
+          onClick={() => void supabase.auth.signOut()}
+        >
+          Выйти из аккаунта
+        </button>
+      </div>
+    )}
+  </div>
+</header>
+
+      {showCreateForm && (
+  <div
+    className="sheet-backdrop"
+    onClick={() => setShowCreateForm(false)}
+  >
+    <div
+      className="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Новая задача"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="sheet-handle" />
+
+      <div className="sheet-header">
+        <h2>Новая задача</h2>
+
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="Закрыть"
+          onClick={() => setShowCreateForm(false)}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="sheet-form">
+        <input
+          className="creator-title"
+          type="text"
+          placeholder="Что нужно сделать?"
+          autoFocus
+          value={newTaskTitle}
+          onChange={(event) => setNewTaskTitle(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              void createTask()
+            }
+          }}
+        />
+
+        <button
+          className="schedule-toggle"
+          type="button"
+          aria-expanded={showSchedule}
+          onClick={() => setShowSchedule((current) => !current)}
+        >
+          {showSchedule ? 'Убрать дату и время' : '+ Дата и время'}
+        </button>
+
+        {showSchedule && (
+          <div className="creator-schedule">
+            <label className="field-label">
+              Дата
+              <input
+                type="date"
+                value={newTaskDate}
+                onChange={(event) => setNewTaskDate(event.target.value)}
+              />
+            </label>
+
+            <label className="field-label">
+              Начало
+              <input
+                type="time"
+                value={newTaskStartTime}
+                onChange={(event) =>
+                  setNewTaskStartTime(event.target.value)
+                }
+              />
+            </label>
+
+            <label className="field-label">
+              Конец
+              <input
+                type="time"
+                value={newTaskEndTime}
+                onChange={(event) =>
+                  setNewTaskEndTime(event.target.value)
+                }
+              />
+            </label>
+          </div>
+        )}
+
+        <p className="sheet-hint">
+          {newTaskDate
+            ? 'Задача появится в плане на выбранный день'
+            : 'Без даты задача попадёт во входящие'}
+        </p>
+
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => void createTask()}
+        >
+          Добавить задачу
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {view === 'today' && (
-        <>
-          <h3>Events</h3>
+        <section className="today-view">
+          <div className="week-bar">
+  <div className="week-bar-top">
+    <p className="week-month">
+      {new Date(`${selectedDate}T00:00:00`).toLocaleDateString(
+        'ru-RU',
+        { month: 'long', year: 'numeric' }
+      )}
+    </p>
 
-          <div className="events-list">
-            {tasks
-              .filter(
-                (task) =>
-                  task.status === 'active' &&
-                  task.type === 'event' &&
-                  task.date === selectedDate
-              )
-              .map((task) => (
-                <div key={task.id}>
-                  <div>
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={async () => {
-                        await moveToDone(task)
-                      }}
-                    />
-
-                    <span>{task.title}</span>
-
-                    <input
-                      type="date"
-                      value={task.date ?? ''}
-                      onChange={async (event) => {
-                        const newDate =
-                          event.target.value ||
-                          null
-
-                        await updateTask(task.id, {
-                          date: newDate,
-                          type: getTaskType(
-                            newDate,
-                            task.start_time
-                          ),
-                        })
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.start_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        const newStartTime =
-                          event.target.value ||
-                          null
-
-                        await updateTask(
-                          task.id,
-                          {
-                            start_time:
-                              newStartTime,
-                            type: getTaskType(
-                              task.date,
-                              newStartTime
-                            ),
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.end_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            end_time:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
-
-                    <button
-                      onClick={() => {
-                        setSelectedTaskId(
-                          (currentId) =>
-                            currentId === task.id
-                              ? null
-                              : task.id
-                        )
-                      }}
-                    >
-                      {selectedTaskId === task.id
-                        ? 'Свернуть'
-                        : 'Просмотреть задачу'}
-                    </button>
-                  </div>
-
-                  {selectedTaskId === task.id && (
-                    <div className="task-card">
-                      <input
-                        type="text"
-                        defaultValue={
-                          task.title
-                        }
-                        onBlur={async (event) => {
-                          const newTitle =
-                            event.target.value.trim()
-
-                          if (
-                            !newTitle ||
-                            newTitle ===
-                              task.title
-                          ) {
-                            event.target.value =
-                              task.title
-                            return
-                          }
-
-                          await updateTask(
-                            task.id,
-                            {
-                              title: newTitle,
-                            }
-                          )
-                        }}
-                      />
-
-                      <textarea
-                        defaultValue={
-                          task.description ?? ''
-                        }
-                        placeholder="Описание"
-                        onBlur={async (event) => {
-                          const newDescription =
-                            event.target.value.trim()
-
-                          await updateTask(
-                            task.id,
-                            {
-                              description:
-                                newDescription ||
-                                null,
-                            }
-                          )
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-
-          <div className="todo">
-            <h3>To-do</h3>
-
-            <div className="todo-item">
-              {tasks
-                .filter(
-                  (task) =>
-                    task.status === 'active' &&
-                    task.type === 'task' &&
-                    task.date === selectedDate
-                )
-                .map((task) => (
-                  <div key={task.id}>
-                    <div>
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onChange={async () => {
-                          await moveToDone(task)
-                        }}
-                      />
-
-                      <span>{task.title}</span>
-
-                      <input
-                        type="date"
-                        value={task.date ?? ''}
-                        onChange={async (event) => {
-                          const newDate =
-                            event.target.value ||
-                            null
-
-                          await updateTask(
-                            task.id,
-                            {
-                              date: newDate,
-                              type: getTaskType(
-                                newDate,
-                                task.start_time
-                              ),
-                            }
-                          )
-                        }}
-                      />
-
-                      <input
-                        type="time"
-                        value={
-                          task.start_time ?? ''
-                        }
-                        onChange={async (event) => {
-                          const newStartTime =
-                            event.target.value ||
-                            null
-
-                          await updateTask(
-                            task.id,
-                            {
-                              start_time:
-                                newStartTime,
-                              type: getTaskType(
-                                task.date,
-                                newStartTime
-                              ),
-                            }
-                          )
-                        }}
-                      />
-
-                      <input
-                        type="time"
-                        value={
-                          task.end_time ?? ''
-                        }
-                        onChange={async (event) => {
-                          await updateTask(
-                            task.id,
-                            {
-                              end_time:
-                                event.target.value ||
-                                null,
-                            }
-                          )
-                        }}
-                      />
-
-                      <button
-                        onClick={() => {
-                          setSelectedTaskId(
-                            (currentId) =>
-                              currentId === task.id
-                                ? null
-                                : task.id
-                          )
-                        }}
-                      >
-                        {selectedTaskId === task.id
-                          ? 'Свернуть'
-                          : 'Просмотреть задачу'}
-                      </button>
-                    </div>
-
-                    {selectedTaskId === task.id && (
-                      <div className="task-card">
-                        <input
-                          type="text"
-                          defaultValue={
-                            task.title
-                          }
-                          onBlur={async (event) => {
-                            const newTitle =
-                              event.target.value.trim()
-
-                            if (
-                              !newTitle ||
-                              newTitle ===
-                                task.title
-                            ) {
-                              event.target.value =
-                                task.title
-                              return
-                            }
-
-                            await updateTask(
-                              task.id,
-                              {
-                                title: newTitle,
-                              }
-                            )
-                          }}
-                        />
-
-                        <textarea
-                          defaultValue={
-                            task.description ?? ''
-                          }
-                          placeholder="Описание"
-                          onBlur={async (event) => {
-                            const newDescription =
-                              event.target.value.trim()
-
-                            await updateTask(
-                              task.id,
-                              {
-                                description:
-                                  newDescription ||
-                                  null,
-                              }
-                            )
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-            </div>
-          </div>
-        </>
+    <div className="week-bar-actions">
+      {selectedDate !== todayString && (
+        <button
+          className="week-today-button"
+          type="button"
+          onClick={() => setSelectedDate(todayString)}
+        >
+          Сегодня
+        </button>
       )}
 
-      {view === 'inbox' && (
-        <div className="inbox">
-          <h3>Inbox</h3>
+      <button
+        className="icon-button"
+        type="button"
+        onClick={() => changeSelectedDate(-7)}
+        aria-label="Предыдущая неделя"
+      >
+        ‹
+      </button>
 
-          <div className="inbox-item">
-            {tasks
-              .filter(
-                (task) => task.status === 'inbox'
-              )
-              .map((task) => (
-                <div key={task.id}>
-                  <div>
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={async () => {
-                        await moveToDone(task)
-                      }}
-                    />
+      <button
+        className="icon-button"
+        type="button"
+        onClick={() => changeSelectedDate(7)}
+        aria-label="Следующая неделя"
+      >
+        ›
+      </button>
+    </div>
+  </div>
 
-                    <span>{task.title}</span>
+  <div className="week-strip">
+    {weekDays.map((day) => {
+      const date = new Date(`${day}T00:00:00`)
+      const isSelected = day === selectedDate
+      const hasTasks = tasks.some(
+        (task) => task.status === 'active' && task.date === day
+      )
 
-                    <input
-                      type="date"
-                      value={task.date ?? ''}
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            date:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
+      return (
+        <button
+          key={day}
+          className={`week-day ${isSelected ? 'is-selected' : ''} ${
+            day === todayString ? 'is-today' : ''
+          }`}
+          type="button"
+          aria-pressed={isSelected}
+          onClick={() => setSelectedDate(day)}
+        >
+          <span className="week-day-name">
+            {date.toLocaleDateString('ru-RU', { weekday: 'short' })}
+          </span>
+          <span className="week-day-number">{date.getDate()}</span>
+          <span
+            className={`week-day-dot ${hasTasks ? 'has-tasks' : ''}`}
+          />
+        </button>
+      )
+    })}
+  </div>
+</div>
 
-                    <input
-                      type="time"
-                      value={
-                        task.start_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            start_time:
-                              event.target.value ||
-                              null,
-                            type: getTaskType(
-                              task.date,
-                              event.target.value ||
-                                null
-                            ),
-                          }
-                        )
-                      }}
-                    />
+          <section className="task-section">
+                        <div className="task-section-heading">
+              <div className="heading-with-hint">
+                <h3>События</h3>
+                <button
+                  className="hint-button"
+                  type="button"
+                  aria-label="Что такое события"
+                  aria-expanded={showEventsHint}
+                  onClick={() => setShowEventsHint((current) => !current)}
+                >
+                  ?
+                </button>
+              </div>
+                            <span>
+                {todayEvents.filter((task, index) => isEventPast(task, index)).length}{' '}
+                из {todayEvents.length}
+              </span>
+            </div>
 
-                    <input
-                      type="time"
-                      value={
-                        task.end_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            end_time:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
+            {showEventsHint && (
+              <p className="hint-popover" role="status">
+                События — это дела с точной датой и временем начала.
+                Они выстраиваются на таймлайне по порядку и становятся
+                бледными, когда заканчиваются или когда начинается
+                следующее событие.
+              </p>
+            )}
 
-                    <button
-                      onClick={() => {
-                        setSelectedTaskId(
-                          (currentId) =>
-                            currentId === task.id
-                              ? null
-                              : task.id
-                        )
-                      }}
-                    >
-                      {selectedTaskId === task.id
-                        ? 'Свернуть'
-                        : 'Просмотреть задачу'}
-                    </button>
+            {renderEventTimeline(
+              todayEvents,
+              (task) => (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void moveToInbox(task)}
+                  >
+                    В Inbox
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void moveToIdeas(task)}
+                  >
+                    В Ideas
+                  </button>
+                </>
+              ),
+              'На этот день событий пока нет.'
+            )}
+          </section>
 
-                    <button
-                      onClick={async () => {
-                        await moveToInProgress(task)
-                      }}
-                    >
-                      В In Progress
-                    </button>
+          <section className="task-section">
+                        <div className="task-section-heading">
+              <div className="heading-with-hint">
+                <h3>To-do</h3>
+                <button
+                  className="hint-button"
+                  type="button"
+                  aria-label="Что такое задачи"
+                  aria-expanded={showTodoHint}
+                  onClick={() => setShowTodoHint((current) => !current)}
+                >
+                  ?
+                </button>
+              </div>
+              <span>
+                {todayTasks.filter((task) => task.status === 'done').length} из{' '}
+                {todayTasks.length}
+              </span>
+            </div>
 
-                    <button
-                      onClick={async () => {
-                        await moveToIdeas(task)
-                      }}
-                    >
-                      В Ideas
-                    </button>
+            {showTodoHint && (
+              <p className="hint-popover" role="status">
+                To-do задачи — это дела без точного времени: достаточно выбрать
+                день. Отмеченные остаются в списке, бледнеют и уходят вниз.
+                Невыполненные задачи с прошлых дней собираются в блоке
+                «Не завершено».
+              </p>
+            )}
 
-                    <button
-                      onClick={async () => {
-                        await moveToDone(task)
-                      }}
-                    >
-                      В Done
-                    </button>
-                  </div>
+            {renderTaskList(
+              todayTasks,
+              (task) => (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void moveToInbox(task)}
+                  >
+                    В Inbox
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void moveToIdeas(task)}
+                  >
+                    В Ideas
+                  </button>
+                </>
+              ),
+                            'На этот день задач пока нет.',
+              true,
+              true
+            )}
+          </section>
+        </section>
+      )}
 
-                  {selectedTaskId === task.id && (
-                    <div className="task-card">
-                      <input
-                        type="text"
-                        defaultValue={
-                          task.title
-                        }
-                        onBlur={async (event) => {
-                          const newTitle =
-                            event.target.value.trim()
-
-                          if (
-                            !newTitle ||
-                            newTitle ===
-                              task.title
-                          ) {
-                            event.target.value =
-                              task.title
-                            return
-                          }
-
-                          await updateTask(
-                            task.id,
-                            {
-                              title: newTitle,
-                            }
-                          )
-                        }}
-                      />
-
-                      <textarea
-                        defaultValue={
-                          task.description ?? ''
-                        }
-                        placeholder="Описание"
-                        onBlur={async (event) => {
-                          const newDescription =
-                            event.target.value.trim()
-
-                          await updateTask(
-                            task.id,
-                            {
-                              description:
-                                newDescription ||
-                                null,
-                            }
-                          )
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
+      {selectedDate === getTodayString() &&
+  (() => {
+    const overdue = tasks
+      .filter(
+        (task) =>
+          task.status === 'active' &&
+          task.type === 'task' &&
+          task.date !== null &&
+          task.date < getTodayString()
+      )
+      .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+    if (!overdue.length) {
+      return null
+    }
+    return (
+      <section className="task-section overdue-section">
+        <div className="task-section-heading">
+          <h3>Не завершено</h3>
+          <span>{overdue.length}</span>
         </div>
+        {renderTaskList(
+          overdue,
+          (task) => (
+            <>
+              <button
+                type="button"
+                onClick={() => void moveToToday(task)}
+              >
+                На сегодня
+              </button>
+              <button
+                type="button"
+                onClick={() => void moveToInbox(task)}
+              >
+                В Inbox
+              </button>
+              <button
+                type="button"
+                onClick={() => void moveToIdeas(task)}
+              >
+                В Ideas
+              </button>
+            </>
+          ),
+          ''
+        )}
+        <button
+          className="overdue-all-button"
+          type="button"
+          onClick={() => void moveAllToToday(overdue)}
+        >
+          Перенести всё на сегодня
+        </button>
+      </section>
+    )
+  })()}
+
+      {view === 'inbox' && (
+        <section className="task-section">
+          <div className="task-section-heading">
+            <h3>Входящие</h3>
+            <span>{inboxTasks.length}</span>
+          </div>
+
+          {renderTaskList(
+            inboxTasks,
+            (task) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void moveToInProgress(task)}
+                >
+                  В работу
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToIdeas(task)}
+                >
+                  В идеи
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToDone(task)}
+                >
+                  Готово
+                </button>
+              </>
+            ),
+            'Inbox пуст. Добавьте первую задачу.'
+          )}
+        </section>
       )}
 
       {view === 'ideas' && (
-        <div className="ideas">
-          <h3>Ideas</h3>
-
-          <div className="ideas-item">
-            {tasks
-              .filter(
-                (task) => task.status === 'idea'
-              )
-              .map((task) => (
-                <div key={task.id}>
-                  <div>
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={async () => {
-                        await moveToDone(task)
-                      }}
-                    />
-
-                    <span>{task.title}</span>
-
-                    <input
-                      type="date"
-                      value={task.date ?? ''}
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            date:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.start_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            start_time:
-                              event.target.value ||
-                              null,
-                            type: getTaskType(
-                              task.date,
-                              event.target.value ||
-                                null
-                            ),
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.end_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            end_time:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
-
-                    <button
-                      onClick={() => {
-                        setSelectedTaskId(
-                          (currentId) =>
-                            currentId === task.id
-                              ? null
-                              : task.id
-                        )
-                      }}
-                    >
-                      {selectedTaskId === task.id
-                        ? 'Свернуть'
-                        : 'Просмотреть задачу'}
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToInProgress(task)
-                      }}
-                    >
-                      В In Progress
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToInbox(task)
-                      }}
-                    >
-                      В Inbox
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToDone(task)
-                      }}
-                    >
-                      В Done
-                    </button>
-                  </div>
-
-                  {selectedTaskId === task.id && (
-                    <div className="task-card">
-                      <input
-                        type="text"
-                        defaultValue={
-                          task.title
-                        }
-                        onBlur={async (event) => {
-                          const newTitle =
-                            event.target.value.trim()
-
-                          if (
-                            !newTitle ||
-                            newTitle ===
-                              task.title
-                          ) {
-                            event.target.value =
-                              task.title
-                            return
-                          }
-
-                          await updateTask(
-                            task.id,
-                            {
-                              title: newTitle,
-                            }
-                          )
-                        }}
-                      />
-
-                      <textarea
-                        defaultValue={
-                          task.description ?? ''
-                        }
-                        placeholder="Описание"
-                        onBlur={async (event) => {
-                          const newDescription =
-                            event.target.value.trim()
-
-                          await updateTask(
-                            task.id,
-                            {
-                              description:
-                                newDescription ||
-                                null,
-                            }
-                          )
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+        <section className="task-section">
+          <div className="task-section-heading">
+            <h3>Идеи</h3>
+            <span>{ideaTasks.length}</span>
           </div>
-        </div>
+
+          {renderTaskList(
+            ideaTasks,
+            (task) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void moveToInProgress(task)}
+                >
+                  В работу
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToInbox(task)}
+                >
+                  В Inbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToDone(task)}
+                >
+                  Готово
+                </button>
+              </>
+            ),
+            'Здесь пока нет идей.'
+          )}
+        </section>
       )}
 
       {view === 'in-progress' && (
-        <div className="in-progress">
-          <h3>In Progress</h3>
-
-          <div className="in-progress-item">
-            {tasks
-              .filter(
-                (task) => task.status === 'active'
-              )
-              .map((task) => (
-                <div key={task.id}>
-                  <div>
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={async () => {
-                        await moveToDone(task)
-                      }}
-                    />
-
-                    <span>{task.title}</span>
-
-                    <input
-                      type="date"
-                      value={task.date ?? ''}
-                      onChange={async (event) => {
-                        const newDate =
-                          event.target.value ||
-                          null
-
-                        await updateTask(
-                          task.id,
-                          {
-                            date: newDate,
-                            type: getTaskType(
-                              newDate,
-                              task.start_time
-                            ),
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.start_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        const newStartTime =
-                          event.target.value ||
-                          null
-
-                        await updateTask(
-                          task.id,
-                          {
-                            start_time:
-                              newStartTime,
-                            type: getTaskType(
-                              task.date,
-                              newStartTime
-                            ),
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.end_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            end_time:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
-
-                    <button
-                      onClick={() => {
-                        setSelectedTaskId(
-                          (currentId) =>
-                            currentId === task.id
-                              ? null
-                              : task.id
-                        )
-                      }}
-                    >
-                      {selectedTaskId === task.id
-                        ? 'Свернуть'
-                        : 'Просмотреть задачу'}
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToInbox(task)
-                      }}
-                    >
-                      В Inbox
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToIdeas(task)
-                      }}
-                    >
-                      В Ideas
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToDone(task)
-                      }}
-                    >
-                      В Done
-                    </button>
-                  </div>
-
-                  {selectedTaskId === task.id && (
-                    <div className="task-card">
-                      <input
-                        type="text"
-                        defaultValue={
-                          task.title
-                        }
-                        onBlur={async (event) => {
-                          const newTitle =
-                            event.target.value.trim()
-
-                          if (
-                            !newTitle ||
-                            newTitle ===
-                              task.title
-                          ) {
-                            event.target.value =
-                              task.title
-                            return
-                          }
-
-                          await updateTask(
-                            task.id,
-                            {
-                              title: newTitle,
-                            }
-                          )
-                        }}
-                      />
-
-                      <textarea
-                        defaultValue={
-                          task.description ?? ''
-                        }
-                        placeholder="Описание"
-                        onBlur={async (event) => {
-                          const newDescription =
-                            event.target.value.trim()
-
-                          await updateTask(
-                            task.id,
-                            {
-                              description:
-                                newDescription ||
-                                null,
-                            }
-                          )
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+        <section className="task-section">
+          <div className="task-section-heading">
+            <h3>В работе</h3>
+            <span>{inProgressTasks.length}</span>
           </div>
-        </div>
+
+          {renderTaskList(
+            inProgressTasks,
+            (task) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void moveToInbox(task)}
+                >
+                  В Inbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToIdeas(task)}
+                >
+                  В идеи
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToDone(task)}
+                >
+                  Готово
+                </button>
+              </>
+            ),
+            'Нет задач в работе.'
+          )}
+        </section>
       )}
 
       {view === 'done' && (
-        <div className="done">
-          <h3>Done</h3>
-
-          <div className="done-item">
-            {tasks
-              .filter(
-                (task) => task.status === 'done'
-              )
-              .map((task) => (
-                <div key={task.id}>
-                  <div>
-                    <span>{task.title}</span>
-
-                    <input
-                      type="date"
-                      value={task.date ?? ''}
-                      onChange={async (event) => {
-                        const newDate =
-                          event.target.value ||
-                          null
-
-                        await updateTask(
-                          task.id,
-                          {
-                            date: newDate,
-                            type: getTaskType(
-                              newDate,
-                              task.start_time
-                            ),
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.start_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        const newStartTime =
-                          event.target.value ||
-                          null
-
-                        await updateTask(
-                          task.id,
-                          {
-                            start_time:
-                              newStartTime,
-                            type: getTaskType(
-                              task.date,
-                              newStartTime
-                            ),
-                          }
-                        )
-                      }}
-                    />
-
-                    <input
-                      type="time"
-                      value={
-                        task.end_time ?? ''
-                      }
-                      onChange={async (event) => {
-                        await updateTask(
-                          task.id,
-                          {
-                            end_time:
-                              event.target.value ||
-                              null,
-                          }
-                        )
-                      }}
-                    />
-
-                    <button
-                      onClick={() => {
-                        setSelectedTaskId(
-                          (currentId) =>
-                            currentId === task.id
-                              ? null
-                              : task.id
-                        )
-                      }}
-                    >
-                      {selectedTaskId === task.id
-                        ? 'Свернуть'
-                        : 'Просмотреть задачу'}
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToInProgress(task)
-                      }}
-                    >
-                      В In Progress
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await moveToInbox(task)
-                      }}
-                    >
-                      В Inbox
-                    </button>
-
-                    <button
-                      onClick={async () => {
-                        await deleteTask(task.id)
-                      }}
-                    >
-                      Удалить совсем
-                    </button>
-                  </div>
-
-                  {selectedTaskId === task.id && (
-                    <div className="task-card">
-                      <input
-                        type="text"
-                        defaultValue={
-                          task.title
-                        }
-                        onBlur={async (event) => {
-                          const newTitle =
-                            event.target.value.trim()
-
-                          if (
-                            !newTitle ||
-                            newTitle ===
-                              task.title
-                          ) {
-                            event.target.value =
-                              task.title
-                            return
-                          }
-
-                          await updateTask(
-                            task.id,
-                            {
-                              title: newTitle,
-                            }
-                          )
-                        }}
-                      />
-
-                      <textarea
-                        defaultValue={
-                          task.description ?? ''
-                        }
-                        placeholder="Описание"
-                        onBlur={async (event) => {
-                          const newDescription =
-                            event.target.value.trim()
-
-                          await updateTask(
-                            task.id,
-                            {
-                              description:
-                                newDescription ||
-                                null,
-                            }
-                          )
-                        }}
-                      />
-
-                      <button
-                        onClick={() => {
-                          setSelectedTaskId(null)
-                        }}
-                      >
-                        Свернуть
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+        <section className="task-section">
+          <div className="task-section-heading">
+            <h3>Готово</h3>
+            <span>{doneTasks.length}</span>
           </div>
-        </div>
+
+          {renderTaskList(
+            doneTasks,
+            (task) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void moveToInProgress(task)}
+                >
+                  Вернуть в работу
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void moveToInbox(task)}
+                >
+                  В Inbox
+                </button>
+                <button
+                  className="danger-button"
+                  type="button"
+                  onClick={() => void deleteTask(task.id)}
+                >
+                  Удалить
+                </button>
+              </>
+            ),
+            'Выполненных задач пока нет.',
+            false
+          )}
+        </section>
       )}
 
-      <button
-        onClick={() => setView('today')}
-      >
-        Today
-      </button>
+      <nav className="bottom-nav" aria-label="Разделы приложения">
+        <button
+          className={view === 'today' ? 'is-active' : ''}
+          type="button"
+          onClick={() => setView('today')}
+        >
+          <span className="nav-icon">◷</span>
+          <span>Сегодня</span>
+        </button>
+
+        <button
+          className={view === 'inbox' ? 'is-active' : ''}
+          type="button"
+          onClick={() => setView('inbox')}
+        >
+          <span className="nav-icon">↓</span>
+          <span>Inbox</span>
+        </button>
+
+        <button
+          className="nav-add-button"
+          type="button"
+          onClick={() => setShowCreateForm(true)}
+          aria-label="Создать задачу"
+        >
+          +
+        </button>
+
+        <button
+          className={view === 'ideas' ? 'is-active' : ''}
+          type="button"
+          onClick={() => setView('ideas')}
+        >
+          <span className="nav-icon">✦</span>
+          <span>Идеи</span>
+        </button>
+
+        <button
+          className={view === 'in-progress' ? 'is-active' : ''}
+          type="button"
+          onClick={() => setView('in-progress')}
+        >
+          <span className="nav-icon">≡</span>
+          <span>В работе</span>
+        </button>
+      </nav>
 
       <button
-        onClick={() => setView('inbox')}
-      >
-        Inbox
-      </button>
-
-      <button
-        onClick={() =>
-          setView('in-progress')
-        }
-      >
-        In Progress
-      </button>
-
-      <button
-        onClick={() => setView('ideas')}
-      >
-        Ideas
-      </button>
-
-      <button
+        className="done-link"
+        type="button"
         onClick={() => setView('done')}
       >
-        Done
+        Посмотреть выполненные задачи
       </button>
-    </div>
+    </main>
   )
 }
 

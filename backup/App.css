@@ -1,0 +1,105 @@
+﻿#root {
+  width: 100%;
+}
+
+.dashboard {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Основные блоки */
+
+.todo,
+.inbox,
+.ideas,
+.in-progress,
+.done {
+  width: 100%;
+  margin-top: 30px;
+}
+
+.todo-item,
+.inbox-item,
+.ideas-item,
+.in-progress-item,
+.done-item,
+.events-list {
+  width: 100%;
+  max-width: 1000px;
+  margin: 10px auto 0;
+}
+
+/* Отдельная задача / событие */
+
+.todo-item > div,
+.inbox-item > div,
+.ideas-item > div,
+.in-progress-item > div,
+.done-item > div,
+.events-list > div {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Основная строка задачи / события */
+
+.todo-item > div > div:first-child,
+.inbox-item > div > div:first-child,
+.ideas-item > div > div:first-child,
+.in-progress-item > div > div:first-child,
+.done-item > div > div:first-child,
+.events-list > div > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Заголовок */
+
+.todo-item span,
+.inbox-item span,
+.ideas-item span,
+.in-progress-item span,
+.done-item span,
+.events-list span {
+  display: inline-block;
+}
+
+/* Аккордеон */
+
+.task-card {
+  width: 100%;
+  max-width: 700px;
+  margin: 10px auto 0;
+  padding: 15px;
+  box-sizing: border-box;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+}
+
+.user-email {
+  margin: 6px 0 0;
+  color: #9aa6b8;
+  font-size: 14px;
+}
+
+.logout-button {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
