@@ -5,6 +5,12 @@ import {
   CreateTaskSheet,
   type NewTaskInput,
 } from './components/CreateTaskSheet'
+
+import {
+  ProfileSheet,
+  type UserProfile,
+} from './components/ProfileSheet'
+
 import { TodayView } from './views/TodayView'
 import {
   DoneView,
@@ -12,6 +18,7 @@ import {
   InboxView,
   InProgressView,
 } from './views/ListViews'
+
 import type { Task, View } from './lib/types'
 import { getTaskType } from './lib/tasks'
 import { getOverdueTasks } from './lib/taskSelectors'
@@ -53,6 +60,8 @@ const VIEW_TITLES: Record<View, string> = {
 
 function Dashboard() {
   const [userEmail, setUserEmail] = useState('')
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+const [showProfile, setShowProfile] = useState(false)
   const [tasks, setTasks] = useState<Task[]>([])
   const [view, setView] = useState<View>('today')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -193,8 +202,29 @@ function Dashboard() {
         return
       }
 
-      setUserEmail(user.email ?? '')
-      setTasks((data ?? []) as Task[])
+      const { data: profileData, error: profileError } = await supabase
+  .from('profiles')
+  .select('id, username, display_name')
+  .eq('id', user.id)
+  .maybeSingle()
+
+if (profileError) {
+  console.error('Не удалось загрузить профиль:', profileError)
+} else {
+  const loadedProfile =
+    profileData ??
+    ({
+      id: user.id,
+      username: null,
+      display_name: null,
+    } as UserProfile)
+
+  setProfile(loadedProfile)
+  setShowProfile(!loadedProfile.username)
+}
+
+setUserEmail(user.email ?? '')
+setTasks((data ?? []) as Task[])
     }
 
     void loadTasks()
@@ -323,13 +353,22 @@ function Dashboard() {
       </header>
 
       {showCreateForm && (
-        <CreateTaskSheet
-          onClose={() => setShowCreateForm(false)}
-          onCreate={createTask}
-        />
-      )}
+  <CreateTaskSheet
+    onClose={() => setShowCreateForm(false)}
+    onCreate={createTask}
+  />
+)}
 
-      {view === 'today' && (
+{profile && showProfile && (
+  <ProfileSheet
+    profile={profile}
+    required={!profile.username}
+    onClose={() => setShowProfile(false)}
+    onSaved={(savedProfile) => setProfile(savedProfile)}
+  />
+)}
+
+{view === 'today' && (
         <TodayView
           tasks={tasks}
           selectedDate={selectedDate}
