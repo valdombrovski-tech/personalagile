@@ -5,6 +5,9 @@ import { UserSearchSheet } from '../components/UserSearchSheet'
 import { TaskList } from '../components/TaskList'
 import type { TaskActions, TaskSelection } from '../lib/taskViewTypes'
 import type { Task } from '../lib/types'
+import { QuickAddBar } from '../components/QuickAddBar'
+import { LifeAreaFilter } from '../components/LifeAreaFilter'
+import { LIFE_AREAS } from "../lib/lifeAreas";
 
 type ListViewProps = {
   tasks: Task[]
@@ -33,9 +36,29 @@ function ListSection({
   )
 }
 
-export function InboxView({ tasks, selection, actions }: ListViewProps) {
+type InboxViewProps = ListViewProps & {
+  onOpenMessages: (conversationId?: string) => void
+  onQuickCreate: (
+    title: string,
+    kind: 'task' | 'idea'
+  ) => Promise<boolean>
+}
+
+export function InboxView({
+  tasks,
+  selection,
+  actions,
+  onOpenMessages,
+  onQuickCreate,
+}: InboxViewProps) {
   const [isDirectNoticeVisible, setIsDirectNoticeVisible] = useState(false)
 const [isUserSearchOpen, setIsUserSearchOpen] = useState(false)
+
+  const [areaFilter, setAreaFilter] = useState<string | null>(null)
+
+  const visibleTasks = areaFilter
+    ? tasks.filter((task) => task.life_area === areaFilter)
+    : tasks
 
   function openUserSearch() {
   setIsDirectNoticeVisible(false)
@@ -43,8 +66,14 @@ const [isUserSearchOpen, setIsUserSearchOpen] = useState(false)
 }
 
   return (
-    <>
-      <DirectPreview onFindUser={openUserSearch} />
+  <>
+
+        <QuickAddBar onCreate={onQuickCreate} />
+
+    <DirectPreview
+  onFindUser={openUserSearch}
+  onOpenMessages={onOpenMessages}
+/>
 
       {isUserSearchOpen && (
   <UserSearchSheet onClose={() => setIsUserSearchOpen(false)} />
@@ -56,12 +85,22 @@ const [isUserSearchOpen, setIsUserSearchOpen] = useState(false)
         </p>
       )}
 
-      <ListSection title="Мои задачи" count={tasks.length}>
+            <ListSection title="Мои задачи" count={visibleTasks.length}>
+        <LifeAreaFilter
+          areas={LIFE_AREAS}
+          value={areaFilter}
+          onChange={setAreaFilter}
+        />
+
         <TaskList
-          tasks={tasks}
+          tasks={visibleTasks}
           selection={selection}
           actions={actions}
-          emptyText="Inbox пуст. Добавьте первую задачу."
+          emptyText={
+            areaFilter
+              ? 'В этой сфере пока нет задач.'
+              : 'Inbox пуст. Добавьте первую задачу.'
+          }
           renderActions={(task) => (
             <>
               <button

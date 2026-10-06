@@ -17,6 +17,8 @@ export function UserSearchSheet({ onClose }: UserSearchSheetProps) {
   const [results, setResults] = useState<SearchProfile[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState('')
+  const [sendingToUserId, setSendingToUserId] = useState<string | null>(null)
+const [sentToUserIds, setSentToUserIds] = useState<string[]>([])
 
   useEffect(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -62,6 +64,31 @@ export function UserSearchSheet({ onClose }: UserSearchSheetProps) {
       window.clearTimeout(timeoutId)
     }
   }, [query])
+
+  async function sendFriendRequest(targetUserId: string) {
+    setError('')
+    setSendingToUserId(targetUserId)
+
+    const { error: requestError } = await supabase.rpc(
+      'send_friend_request',
+      { target_user_id: targetUserId }
+    )
+
+    setSendingToUserId(null)
+
+    if (requestError) {
+      console.error('Не удалось отправить запрос в друзья:', requestError)
+      setError('Не удалось отправить запрос. Попробуйте ещё раз.')
+      return
+    }
+
+    setSentToUserIds((currentIds) =>
+      currentIds.includes(targetUserId)
+        ? currentIds
+        : [...currentIds, targetUserId]
+    )
+  }
+
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -149,16 +176,19 @@ export function UserSearchSheet({ onClose }: UserSearchSheetProps) {
                   </div>
 
                   <button
-                    className="user-search-add-button"
-                    type="button"
-                    onClick={() =>
-                      window.alert(
-                        'Запросы в друзья добавим на следующем шаге.'
-                      )
-                    }
-                  >
-                    Добавить
-                  </button>
+  className="user-search-add-button"
+  type="button"
+  disabled={
+    sendingToUserId === profile.id || sentToUserIds.includes(profile.id)
+  }
+  onClick={() => void sendFriendRequest(profile.id)}
+>
+  {sendingToUserId === profile.id
+    ? 'Отправляем…'
+    : sentToUserIds.includes(profile.id)
+      ? 'Запрос отправлен'
+      : 'Добавить'}
+</button>
                 </article>
               ))}
             </div>

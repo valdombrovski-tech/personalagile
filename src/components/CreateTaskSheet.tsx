@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LifeAreaPicker } from './LifeArea'
+import { LifeAreaPicker } from './LifeAreas'
 import { pickerProps } from '../lib/pickerProps'
 import type { LifeArea } from '../lib/types'
 

@@ -12,6 +12,7 @@ import {
 } from './components/ProfileSheet'
 
 import { TodayView } from './views/TodayView'
+import { FriendsView } from './views/FriendsView'
 import {
   DoneView,
   IdeasView,
@@ -28,6 +29,8 @@ import {
   getRelativeDayLabel,
   getTodayString,
 } from './lib/dates'
+import { MessagesView } from './views/MessagesView'
+import { useUnreadMessages } from './lib/useUnreadMessages'
 
 const AFFIRMATIONS = [
   'Хороший день для больших дел',
@@ -69,6 +72,18 @@ const [showProfile, setShowProfile] = useState(false)
   const [selectedDate, setSelectedDate] = useState(getTodayString())
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const [accountPage, setAccountPage] =
+  useState<'friends' | 'messages' | null>(null)
+
+const isFriendsPageOpen = accountPage === 'friends'
+const isMessagesPageOpen = accountPage === 'messages'
+const isAccountPageOpen = accountPage !== null
+const unreadMessages = useUnreadMessages()
+const [messagesInitialId, setMessagesInitialId] = useState<string | null>(
+  null
+)
+
+
 
   async function createTask(input: NewTaskInput) {
     if (!input.title.trim()) {
@@ -110,6 +125,47 @@ const [showProfile, setShowProfile] = useState(false)
     setTasks((currentTasks) => [...currentTasks, data as Task])
     return true
   }
+
+  async function quickCreate(title: string, kind: 'task' | 'idea') {
+    const trimmedTitle = title.trim()
+
+    if (!trimmedTitle) {
+      return false
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      console.error('Не удалось получить текущего пользователя:', userError)
+      return false
+    }
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        user_id: user.id,
+        title: trimmedTitle,
+        status: kind === 'idea' ? 'idea' : 'inbox',
+        type: 'task',
+        date: null,
+        start_time: null,
+        end_time: null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Supabase error:', error)
+      return false
+    }
+
+    setTasks((currentTasks) => [...currentTasks, data as Task])
+    return true
+  }
+
 
   async function updateTask(taskId: string, changes: Partial<Task>) {
     const { data, error } = await supabase
@@ -234,6 +290,14 @@ setTasks((data ?? []) as Task[])
     }
   }, [])
 
+function openMessages(conversationId?: string) {
+  setMessagesInitialId(conversationId ?? null)
+  setAccountPage('messages')
+  setIsAccountMenuOpen(false)
+  setSelectedTaskId(null)
+  setSwipedTaskId(null)
+}
+
   function toggleTaskDetails(taskId: string) {
     setSwipedTaskId(null)
     setSelectedTaskId((currentId) => (currentId === taskId ? null : taskId))
@@ -264,8 +328,11 @@ setTasks((data ?? []) as Task[])
 
   const relativeDayLabel = getRelativeDayLabel(selectedDate)
 
-  const headerTitle =
-    view === 'today'
+ const headerTitle = isFriendsPageOpen
+  ? 'Друзья'
+  : isMessagesPageOpen
+    ? 'Сообщения'
+    : view === 'today'
       ? relativeDayLabel
         ? `${relativeDayLabel}, ${formatSelectedDate(selectedDate)}`
         : formatSelectedDate(selectedDate)
@@ -290,8 +357,13 @@ setTasks((data ?? []) as Task[])
             ? inProgressTasks.length
             : doneTasks.length
 
-  const headerNote =
-    view === 'today' ? getAffirmation() : `Задач: ${headerCount}`
+  const headerNote = isFriendsPageOpen
+  ? 'Ваш круг общения'
+  : isMessagesPageOpen
+    ? 'Личные диалоги'
+    : view === 'today'
+      ? getAffirmation()
+      : `Задач: ${headerCount}`
 
   const headerTitleParts = headerTitle.split(', ')
   const accountInitial = userEmail ? userEmail.charAt(0).toUpperCase() : '·'
@@ -312,14 +384,16 @@ setTasks((data ?? []) as Task[])
           <div className="header-note">
             <p className="header-subtitle">{headerNote}</p>
 
-            <button
-              className="header-add-button"
-              type="button"
-              aria-label="Создать задачу"
-              onClick={() => setShowCreateForm(true)}
-            >
-              +
-            </button>
+            {!isAccountPageOpen && view !== 'inbox' && (
+  <button
+    className="header-add-button"
+    type="button"
+    aria-label="Создать задачу"
+    onClick={() => setShowCreateForm(true)}
+  >
+    +
+  </button>
+)}
           </div>
         </div>
 
@@ -327,11 +401,18 @@ setTasks((data ?? []) as Task[])
           <button
             className="account-menu-trigger"
             type="button"
-            aria-label="Открыть меню профиля"
+            aria-label={
+  unreadMessages > 0
+    ? `Открыть меню профиля, непрочитанных сообщений: ${unreadMessages}`
+    : 'Открыть меню профиля'
+}
             aria-expanded={isAccountMenuOpen}
             onClick={() => setIsAccountMenuOpen((current) => !current)}
           >
             {accountInitial}
+{unreadMessages > 0 && (
+  <span className="account-unread-dot" aria-hidden="true" />
+)}
           </button>
 
           {isAccountMenuOpen && (
@@ -339,6 +420,31 @@ setTasks((data ?? []) as Task[])
               <p className="account-email">
                 {userEmail || 'Загрузка профиля…'}
               </p>
+              <button
+  className="account-friends-button"
+  type="button"
+  onClick={() => {
+    setAccountPage('friends')
+    setIsAccountMenuOpen(false)
+    setSelectedTaskId(null)
+    setSwipedTaskId(null)
+  }}
+>
+  Друзья
+</button>
+
+<button
+  className="account-friends-button"
+  type="button"
+onClick={() => openMessages()}
+>
+  Сообщения
+{unreadMessages > 0 && (
+  <span className="unread-badge">
+    {unreadMessages > 99 ? '99+' : unreadMessages}
+  </span>
+)}
+</button>
 
               <button
                 className="logout-button"
@@ -368,6 +474,22 @@ setTasks((data ?? []) as Task[])
   />
 )}
 
+{isFriendsPageOpen && (
+  <FriendsView onBack={() => setAccountPage(null)} />
+)}
+
+{isMessagesPageOpen && (
+  <MessagesView
+    key={messagesInitialId ?? 'list'}
+    initialConversationId={messagesInitialId}
+    onBack={() => setAccountPage(null)}
+  />
+)}
+
+{!isAccountPageOpen && (
+  <>
+
+
 {view === 'today' && (
         <TodayView
           tasks={tasks}
@@ -378,8 +500,14 @@ setTasks((data ?? []) as Task[])
         />
       )}
 
-      {view === 'inbox' && (
-        <InboxView tasks={inboxTasks} selection={selection} actions={actions} />
+            {view === 'inbox' && (
+              <InboxView
+          tasks={inboxTasks}
+          selection={selection}
+          actions={actions}
+          onOpenMessages={openMessages}
+          onQuickCreate={quickCreate}
+        />
       )}
 
       {view === 'ideas' && (
@@ -408,12 +536,24 @@ setTasks((data ?? []) as Task[])
           <span>Сегодня</span>
         </button>
 
-        <button
+                <button
           className={view === 'inbox' ? 'is-active' : ''}
           type="button"
+          aria-label={
+            unreadMessages > 0
+              ? 'Inbox, есть непрочитанные сообщения'
+              : undefined
+          }
           onClick={() => setView('inbox')}
         >
-          <span className="nav-icon">↓</span>
+          <span className="nav-icon">
+            <span className="nav-icon-glyph">
+              ↓
+              {unreadMessages > 0 && (
+                <span className="nav-unread-dot" aria-hidden="true" />
+              )}
+            </span>
+          </span>
           <span>Inbox</span>
         </button>
 
@@ -452,6 +592,8 @@ setTasks((data ?? []) as Task[])
       >
         Посмотреть выполненные задачи
       </button>
+  </>
+)}
     </main>
   )
 }

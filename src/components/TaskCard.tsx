@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { Inbox, Lightbulb, Check } from 'lucide-react'
-import { LifeAreaBadge, LifeAreaIcon } from './LifeArea'
+import { LifeAreaBadge, LifeAreaIcon } from './LifeAreas'
 import { TaskDetails } from './TaskDetails'
 import { getTaskMeta } from '../lib/tasks'
 import {

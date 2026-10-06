@@ -1,4 +1,4 @@
-import { LifeAreaPicker } from './LifeArea'
+import { LifeAreaPicker } from './LifeAreas'
 import { pickerProps } from '../lib/pickerProps'
 import { formatTime } from '../lib/dates'
 import { getTaskType } from '../lib/tasks'
