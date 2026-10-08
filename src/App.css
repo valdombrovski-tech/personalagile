@@ -2745,3 +2745,11 @@ input[type="checkbox"] {
   cursor: grab;
   user-select: none;
 }
+
+body {
+  padding-top: env(safe-area-inset-top);
+}
+
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
