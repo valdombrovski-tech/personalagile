@@ -20,4 +20,4 @@ export type Task = {
   life_area: LifeArea | null
 }
 
-export type View = 'today' | 'inbox' | 'in-progress' | 'ideas' | 'done'
+export type View = 'today' | 'inbox' | 'in-progress' | 'ideas' | 'done' | 'biorhythms'
