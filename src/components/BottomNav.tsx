@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Repeat,
   Sparkles,
+   Utensils,
 } from 'lucide-react'
 import type { View } from '../lib/types'
 
@@ -25,7 +26,7 @@ type OpenMenu = 'today' | 'inbox' | 'my' | null
 
 
 const INBOX_GROUP: View[] = ['inbox', 'ideas', 'in-progress', 'done']
-const MY_GROUP: View[] = ['biorhythms', 'habits']
+const MY_GROUP: View[] = ['biorhythms', 'habits', 'nutrition']
 
 
 export function BottomNav({
@@ -240,6 +241,17 @@ export function BottomNav({
               <Repeat size={20} aria-hidden="true" />
               <span>Привычки</span>
             </button>
+
+            <button
+              className="nav-popover-item"
+              type="button"
+              role="menuitem"
+              onClick={() => navigate('nutrition')}
+            >
+              <Utensils size={20} aria-hidden="true" />
+              <span>Питание</span>
+            </button>
+
           </div>
         )}
 

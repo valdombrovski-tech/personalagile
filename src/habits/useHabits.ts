@@ -5,6 +5,7 @@ import type { Habit, HabitLog } from './types'
 export function useHabits() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [logs, setLogs] = useState<HabitLog[]>([])
+    const [archivedHabits, setArchivedHabits] = useState<Habit[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingDates, setPendingDates] = useState<string[]>([])
@@ -16,7 +17,7 @@ export function useHabits() {
 
     async function load() {
       try {
-        const [habitsResult, logsResult] = await Promise.all([
+                const [habitsResult, logsResult, archivedResult] = await Promise.all([
           supabase
             .from('habits')
             .select('*')
@@ -24,18 +25,26 @@ export function useHabits() {
             .order('position')
             .order('created_at'),
 
-          supabase
+                    supabase
             .from('habit_logs')
             .select('id, habit_id, log_date, status'),
+
+          supabase
+            .from('habits')
+            .select('*')
+            .not('archived_at', 'is', null)
+            .order('archived_at', { ascending: false }),
         ])
 
         if (habitsResult.error) throw habitsResult.error
         if (logsResult.error) throw logsResult.error
+                if (archivedResult.error) throw archivedResult.error
 
         if (!isMounted) return
 
         setHabits((habitsResult.data ?? []) as Habit[])
         setLogs((logsResult.data ?? []) as HabitLog[])
+                setArchivedHabits((archivedResult.data ?? []) as Habit[])
         setError('')
       } catch (loadError) {
         console.error('Не удалось загрузить привычки:', loadError)
@@ -153,6 +162,98 @@ export function useHabits() {
     }
   }
 
+  async function archiveHabit(habitId: string): Promise<boolean> {
+    setError('')
+
+    try {
+      const { data, error: archiveError } = await supabase
+        .from('habits')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', habitId)
+        .select()
+        .single()
+
+      if (archiveError) throw archiveError
+
+      setHabits((current) =>
+        current.filter((habit) => habit.id !== habitId)
+      )
+
+      setArchivedHabits((current) => [data as Habit, ...current])
+
+      return true
+    } catch (archiveError) {
+      console.error('Не удалось архивировать привычку:', archiveError)
+      setError('Не удалось архивировать привычку. Попробуй ещё раз.')
+
+      return false
+    }
+  }
+
+  async function restoreHabit(habitId: string): Promise<boolean> {
+    setError('')
+
+    try {
+      const { data, error: restoreError } = await supabase
+        .from('habits')
+        .update({ archived_at: null })
+        .eq('id', habitId)
+        .select()
+        .single()
+
+      if (restoreError) throw restoreError
+
+      setArchivedHabits((current) =>
+        current.filter((habit) => habit.id !== habitId)
+      )
+
+      setHabits((current) => [...current, data as Habit])
+
+      return true
+    } catch (restoreError) {
+      console.error('Не удалось вернуть привычку:', restoreError)
+      setError('Не удалось вернуть привычку. Попробуй ещё раз.')
+
+      return false
+    }
+  }
+
+  async function deleteHabitForever(habitId: string): Promise<boolean> {
+    setError('')
+
+    try {
+      const { error: logsError } = await supabase
+        .from('habit_logs')
+        .delete()
+        .eq('habit_id', habitId)
+
+      if (logsError) throw logsError
+
+      const { error: deleteError } = await supabase
+        .from('habits')
+        .delete()
+        .eq('id', habitId)
+        .select('id')
+        .single()
+
+      if (deleteError) throw deleteError
+
+      setArchivedHabits((current) =>
+        current.filter((habit) => habit.id !== habitId)
+      )
+
+      setLogs((current) =>
+        current.filter((log) => log.habit_id !== habitId)
+      )
+
+      return true
+    } catch (deleteError) {
+      console.error('Не удалось удалить привычку:', deleteError)
+      setError('Не удалось удалить привычку. Попробуй ещё раз.')
+
+      return false
+    }
+  }
 
   async function cycleLog(
     habitId: string,
@@ -239,6 +340,10 @@ export function useHabits() {
     pendingDates,
     addHabit,
         updateHabit,
+            archiveHabit,
+    archivedHabits,
+    restoreHabit,
+    deleteHabitForever,
     cycleLog,
   }
 }

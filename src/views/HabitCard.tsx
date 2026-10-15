@@ -97,7 +97,10 @@ type HabitCardProps = {
     input: { title: string; icon: string }
   ) => Promise<boolean>
   cycleLog: (habitId: string, date: string) => Promise<void>
+ archiveHabit: (habitId: string) => Promise<boolean>
 }
+
+
 
 export function HabitCard({
   habit,
@@ -105,6 +108,7 @@ export function HabitCard({
   pendingDates,
   updateHabit,
   cycleLog,
+    archiveHabit,
 }: HabitCardProps) {
   const [monthDate, setMonthDate] = useState(() => {
     const now = new Date()
@@ -120,6 +124,9 @@ export function HabitCard({
   )
   const [selectedTitle, setSelectedTitle] = useState(habit.title)
   const [isSaving, setIsSaving] = useState(false)
+
+    const [isConfirmingArchive, setIsConfirmingArchive] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   const year = monthDate.getFullYear()
   const month = monthDate.getMonth()
@@ -418,6 +425,7 @@ export function HabitCard({
   function closeEditor() {
     setIsEditorOpen(false)
     setIsEmojiPickerOpen(false)
+    setIsConfirmingArchive(false)
   }
 
   function toggleEditor() {
@@ -453,7 +461,25 @@ export function HabitCard({
     }
   }
 
-  return (
+    async function archiveThisHabit() {
+    if (isArchiving) return
+
+    if (!isConfirmingArchive) {
+      setIsConfirmingArchive(true)
+      return
+    }
+
+    setIsArchiving(true)
+
+    try {
+      await archiveHabit(habit.id)
+    } finally {
+      setIsArchiving(false)
+      setIsConfirmingArchive(false)
+    }
+  }
+
+    return (
     <div className="habit-calendar-card">
       <div className="habit-calendar-header">
         <div className="habit-today-control">
@@ -577,6 +603,20 @@ export function HabitCard({
           </div>
 
           <div className="habit-icon-editor-actions">
+
+            <button
+              className="habit-icon-delete"
+              type="button"
+              disabled={isSaving || isArchiving}
+              onClick={() => void archiveThisHabit()}
+            >
+              {isArchiving
+                ? 'Архивируем…'
+                : isConfirmingArchive
+                  ? 'В архив?'
+                  : 'Архивировать'}
+            </button>
+
             <button
               className="habit-icon-cancel"
               type="button"

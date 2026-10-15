@@ -39,6 +39,7 @@ import { BiorhythmsView } from './views/BiorhythmsView'
 import { AccountMenu } from './components/AccountMenu'
 import { AccountView } from './components/AccountView'
 import { HabitsView } from './views/HabitsView'
+import { NutritionPlannerView } from './views/NutritionPlannerView'
 
 const AFFIRMATIONS = [
   'Хороший день для больших дел',
@@ -71,7 +72,8 @@ const VIEW_TITLES: Record<View, string> = {
   ideas: 'Идеи',
   done: 'Готово',
     biorhythms: 'Биоритмы',
-      habits: 'Привычки',
+          habits: 'Привычки',
+  nutrition: 'Питание',
 }
 
 
@@ -497,9 +499,11 @@ function Dashboard() {
         ? getAffirmation()
                 : view === 'biorhythms'
           ? 'Ваш ритм энергии'
-          : view === 'habits'
+                    : view === 'habits'
             ? 'Маленькие шаги каждый день'
-            : `Задач: ${headerCount}`
+            : view === 'nutrition'
+              ? 'План питания на неделю'
+              : `Задач: ${headerCount}`
 
 
   const headerTitleParts = headerTitle.split(', ')
@@ -526,7 +530,8 @@ function Dashboard() {
                         {!isAccountPageOpen &&
               view !== 'inbox' &&
               view !== 'biorhythms' && 
-              view !== 'habits' &&
+                            view !== 'habits' &&
+              view !== 'nutrition' &&
               (
               <button
                 className="header-add-button"
@@ -647,8 +652,10 @@ function Dashboard() {
 
                               {view === 'biorhythms' && <BiorhythmsView birthDate={birthDate} />}
                                         {view === 'habits' && <HabitsView />}
-
-                              {view !== 'biorhythms' && view !== 'habits' && (
+          {view === 'nutrition' && <NutritionPlannerView />}
+                    {view !== 'biorhythms' &&
+            view !== 'habits' &&
+            view !== 'nutrition' && (
             <button
               className="done-link"
               type="button"

@@ -47,6 +47,10 @@ export function HabitsView() {
     pendingDates,
     addHabit,
     updateHabit,
+        archiveHabit,
+    archivedHabits,
+    restoreHabit,
+    deleteHabitForever,
     cycleLog,
   } = useHabits()
 
@@ -56,6 +60,12 @@ export function HabitsView() {
   const [newIcon, setNewIcon] = useState('✨')
   const [isNewEmojiPickerOpen, setIsNewEmojiPickerOpen] =
     useState(false)
+
+      const [isArchiveOpen, setIsArchiveOpen] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(
+    null
+  )
+  const [busyArchiveId, setBusyArchiveId] = useState<string | null>(null)
 
   async function createSobrietyHabit() {
     if (isCreating) return
@@ -106,6 +116,37 @@ export function HabitsView() {
   }
 
   const stats = getHabitStats(habits, logs)
+
+    async function restoreFromArchive(habitId: string) {
+    if (busyArchiveId) return
+
+    setConfirmDeleteId(null)
+    setBusyArchiveId(habitId)
+
+    try {
+      await restoreHabit(habitId)
+    } finally {
+      setBusyArchiveId(null)
+    }
+  }
+
+  async function deleteFromArchive(habitId: string) {
+    if (busyArchiveId) return
+
+    if (confirmDeleteId !== habitId) {
+      setConfirmDeleteId(habitId)
+      return
+    }
+
+    setBusyArchiveId(habitId)
+
+    try {
+      await deleteHabitForever(habitId)
+    } finally {
+      setBusyArchiveId(null)
+      setConfirmDeleteId(null)
+    }
+  }
 
   const bestStreakStat = stats.reduce<HabitStat | null>(
     (best, item) =>
@@ -223,6 +264,7 @@ export function HabitsView() {
             logs={logs}
             pendingDates={pendingDates}
             updateHabit={updateHabit}
+                        archiveHabit={archiveHabit}
             cycleLog={cycleLog}
           />
         ))
@@ -317,6 +359,52 @@ export function HabitsView() {
           </div>
         </div>
       )}
+
+      {archivedHabits.length > 0 && (
+        <div className="habit-archive">
+          <button
+            className="habit-archive-toggle"
+            type="button"
+            aria-expanded={isArchiveOpen}
+            onClick={() => setIsArchiveOpen((current) => !current)}
+          >
+            Архив ({archivedHabits.length})
+          </button>
+
+          {isArchiveOpen && (
+            <ul className="habit-archive-list">
+              {archivedHabits.map((habit) => (
+                <li className="habit-archive-item" key={habit.id}>
+                  <span className="habit-archive-title">
+                    {getHabitEmoji(habit.icon)} {habit.title}
+                  </span>
+
+                  <button
+                    className="habit-archive-restore"
+                    type="button"
+                    disabled={busyArchiveId !== null}
+                    onClick={() => void restoreFromArchive(habit.id)}
+                  >
+                    Вернуть
+                  </button>
+
+                  <button
+                    className="habit-archive-delete"
+                    type="button"
+                    disabled={busyArchiveId !== null}
+                    onClick={() => void deleteFromArchive(habit.id)}
+                  >
+                    {confirmDeleteId === habit.id
+                      ? 'Точно? Вместе с отметками'
+                      : 'Удалить насовсем'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
     </section>
   )
 }
