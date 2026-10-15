@@ -38,6 +38,7 @@ import { useUnreadMessages } from './lib/useUnreadMessages'
 import { BiorhythmsView } from './views/BiorhythmsView'
 import { AccountMenu } from './components/AccountMenu'
 import { AccountView } from './components/AccountView'
+import { HabitsView } from './views/HabitsView'
 
 const AFFIRMATIONS = [
   'Хороший день для больших дел',
@@ -70,6 +71,7 @@ const VIEW_TITLES: Record<View, string> = {
   ideas: 'Идеи',
   done: 'Готово',
     biorhythms: 'Биоритмы',
+      habits: 'Привычки',
 }
 
 
@@ -493,9 +495,11 @@ function Dashboard() {
       ? 'Личные диалоги'
             : view === 'today'
         ? getAffirmation()
-        : view === 'biorhythms'
+                : view === 'biorhythms'
           ? 'Ваш ритм энергии'
-          : `Задач: ${headerCount}`
+          : view === 'habits'
+            ? 'Маленькие шаги каждый день'
+            : `Задач: ${headerCount}`
 
 
   const headerTitleParts = headerTitle.split(', ')
@@ -521,7 +525,9 @@ function Dashboard() {
 
                         {!isAccountPageOpen &&
               view !== 'inbox' &&
-              view !== 'biorhythms' && (
+              view !== 'biorhythms' && 
+              view !== 'habits' &&
+              (
               <button
                 className="header-add-button"
                 type="button"
@@ -640,9 +646,9 @@ function Dashboard() {
           )}
 
                               {view === 'biorhythms' && <BiorhythmsView birthDate={birthDate} />}
+                                        {view === 'habits' && <HabitsView />}
 
-
-                    {view !== 'biorhythms' && (
+                              {view !== 'biorhythms' && view !== 'habits' && (
             <button
               className="done-link"
               type="button"

@@ -6,6 +6,8 @@ import {
   Lightbulb,
   ListChecks,
   MessageCircle,
+  Repeat,
+  Sparkles,
 } from 'lucide-react'
 import type { View } from '../lib/types'
 
@@ -19,10 +21,11 @@ type BottomNavProps = {
 }
 
 
-type OpenMenu = 'today' | 'inbox' | null
+type OpenMenu = 'today' | 'inbox' | 'my' | null
 
 
 const INBOX_GROUP: View[] = ['inbox', 'ideas', 'in-progress', 'done']
+const MY_GROUP: View[] = ['biorhythms', 'habits']
 
 
 export function BottomNav({
@@ -76,8 +79,14 @@ export function BottomNav({
   }
 
 
+  function toggleMyMenu() {
+    setOpenMenu((current) => (current === 'my' ? null : 'my'))
+  }
+
+
   const isInboxGroupActive =
     activeView !== null && INBOX_GROUP.includes(activeView)
+  const isMyGroupActive = activeView !== null && MY_GROUP.includes(activeView)
 
 
   return (
@@ -203,17 +212,49 @@ export function BottomNav({
       >
         +
       </button>
+
+
+      <div className="nav-slot">
+        {openMenu === 'my' && (
+          <div
+            className="nav-popover nav-popover-grid nav-popover-end"
+            role="menu"
+          >
             <button
-        className={activeView === 'biorhythms' ? 'is-active' : ''}
-        type="button"
-        aria-label="Мои биоритмы"
-        onClick={() => navigate('biorhythms')}
-      >
-        <span className="nav-icon">
-          <Activity size={20} aria-hidden="true" />
-        </span>
-        <span>Биоритмы</span>
-      </button>
+              className="nav-popover-item"
+              type="button"
+              role="menuitem"
+              onClick={() => navigate('biorhythms')}
+            >
+              <Activity size={20} aria-hidden="true" />
+              <span>Биоритмы</span>
+            </button>
+
+
+            <button
+              className="nav-popover-item"
+              type="button"
+              role="menuitem"
+              onClick={() => navigate('habits')}
+            >
+              <Repeat size={20} aria-hidden="true" />
+              <span>Привычки</span>
+            </button>
+          </div>
+        )}
+
+
+        <button
+          className={isMyGroupActive ? 'is-active' : ''}
+          type="button"
+          onClick={toggleMyMenu}
+        >
+          <span className="nav-icon">
+            <Sparkles size={20} aria-hidden="true" />
+          </span>
+          <span>My</span>
+        </button>
+      </div>
     </nav>
   )
 }

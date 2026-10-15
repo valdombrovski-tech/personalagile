@@ -6,3 +6,5 @@ npm run dev
 
 VITE v8.3.1  ready in ...
 ➜  Local:   http://localhost:5173/
+
+npm run build
