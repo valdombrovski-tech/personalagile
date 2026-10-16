@@ -12,7 +12,7 @@ export type NewFoodInput = {
   carbs: number
   fiber: number
   micros?: Record<string, number>
-    source?: 'manual' | 'open_food_facts' | 'usda'
+  source?: 'manual' | 'open_food_facts' | 'usda'
 }
 
 export function useFoods() {
@@ -24,10 +24,21 @@ export function useFoods() {
     let isMounted = true
 
     async function load() {
+      setIsLoading(true)
+
       try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser()
+
+        if (authError) throw authError
+        if (!user) throw new Error('Необходимо войти в аккаунт')
+
         const { data, error: loadError } = await supabase
           .from('foods')
           .select('*')
+          .or(`owner_id.eq.${user.id},visibility.eq.shared`)
           .order('name')
 
         if (loadError) throw loadError
@@ -39,6 +50,7 @@ export function useFoods() {
         console.error('Не удалось загрузить продукты:', loadError)
 
         if (isMounted) {
+          setFoods([])
           setError('Не удалось загрузить продукты')
         }
       } finally {
@@ -57,6 +69,7 @@ export function useFoods() {
 
   async function addFood(input: NewFoodInput): Promise<Food | null> {
     const name = input.name.trim()
+
     const numbers = [
       input.kcal,
       input.protein,
@@ -78,9 +91,18 @@ export function useFoods() {
     setError('')
 
     try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError) throw authError
+      if (!user) throw new Error('Необходимо войти в аккаунт')
+
       const { data, error: insertError } = await supabase
         .from('foods')
         .insert({
+          owner_id: user.id,
           name,
           brand: input.brand?.trim() || null,
           barcode: input.barcode?.trim() || null,
@@ -90,7 +112,9 @@ export function useFoods() {
           carbs: input.carbs,
           fiber: input.fiber,
           micros: input.micros ?? {},
-                    source: input.source ?? 'manual',
+          source: input.source ?? 'manual',
+          visibility: 'private',
+          status: 'unverified',
         })
         .select()
         .single()
@@ -100,7 +124,9 @@ export function useFoods() {
       const food = data as Food
 
       setFoods((current) =>
-        [...current, food].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+        [...current.filter((item) => item.id !== food.id), food].sort(
+          (a, b) => a.name.localeCompare(b.name, 'ru')
+        )
       )
 
       return food

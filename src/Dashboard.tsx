@@ -41,6 +41,14 @@ import { AccountView } from './components/AccountView'
 import { HabitsView } from './views/HabitsView'
 import { NutritionPlannerView } from './views/NutritionPlannerView'
 
+import { ClipboardList, UsersRound } from 'lucide-react'
+import { NutritionAccessSheet } from './components/NutritionAccessSheet'
+
+import {
+  NutritionWardsSheet,
+  type NutritionWard,
+} from './components/NutritionWardsSheet'
+
 const AFFIRMATIONS = [
   'Хороший день для больших дел',
   'Маленькие шаги ведут далеко',
@@ -81,6 +89,13 @@ function Dashboard() {
     const [userEmail, setUserEmail] = useState('')
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [showProfile, setShowProfile] = useState(false)
+
+  const [showNutritionAccess, setShowNutritionAccess] = useState(false)
+
+  const [showNutritionWards, setShowNutritionWards] = useState(false)
+  const [nutritionWard, setNutritionWard] =
+    useState<NutritionWard | null>(null)
+
   const [tasks, setTasks] = useState<Task[]>([])
   const [view, setView] = useState<View>('today')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -546,16 +561,59 @@ function Dashboard() {
         </div>
 
 
-                <AccountMenu
-          userEmail={userEmail}
-          unreadMessages={unreadMessages}
-                    onOpenAccount={openAccount}
-          onOpenFriends={openFriends}
-          onOpenMessages={() => openMessages()}
-          onSignOut={() => void supabase.auth.signOut()}
-        />
+                                <div className="dashboard-header-actions">
+          {!isAccountPageOpen && view === 'nutrition' && (
+            <>
+              {!nutritionWard && (
+                <button
+                  className="nutrition-access-header-button"
+                  type="button"
+                  aria-label="Управление доступом к моему питанию"
+                  title="Доступ к моему питанию"
+                  onClick={() => setShowNutritionAccess(true)}
+                >
+                  <UsersRound size={20} aria-hidden="true" />
+                </button>
+              )}
+
+              <button
+                className="nutrition-access-header-button"
+                type="button"
+                aria-label="Открыть планы подопечных"
+                title="Подопечные"
+                onClick={() => setShowNutritionWards(true)}
+              >
+                <ClipboardList size={20} aria-hidden="true" />
+              </button>
+            </>
+          )}
+
+          <AccountMenu
+            userEmail={userEmail}
+            unreadMessages={unreadMessages}
+            onOpenAccount={openAccount}
+            onOpenFriends={openFriends}
+            onOpenMessages={() => openMessages()}
+            onSignOut={() => void supabase.auth.signOut()}
+          />
+        </div>
       </header>
 
+            {showNutritionWards && (
+        <NutritionWardsSheet
+          onClose={() => setShowNutritionWards(false)}
+          onSelect={(ward) => {
+            setNutritionWard(ward)
+            setShowNutritionWards(false)
+          }}
+        />
+      )}
+
+      {showNutritionAccess && (
+        <NutritionAccessSheet
+          onClose={() => setShowNutritionAccess(false)}
+        />
+      )}
 
       {showCreateForm && (
         <CreateTaskSheet
@@ -652,7 +710,46 @@ function Dashboard() {
 
                               {view === 'biorhythms' && <BiorhythmsView birthDate={birthDate} />}
                                         {view === 'habits' && <HabitsView />}
-          {view === 'nutrition' && <NutritionPlannerView />}
+                    {view === 'nutrition' && (
+            <>
+              {nutritionWard && (
+                <div className="nutrition-owner-banner">
+                  <div className="nutrition-owner-copy">
+                    <span className="nutrition-owner-name">
+                      План:{' '}
+                      {nutritionWard.display_name?.trim() ||
+                        (nutritionWard.username
+                          ? `@${nutritionWard.username}`
+                          : 'Пользователь')}
+                    </span>
+
+                    <span className="nutrition-owner-role">
+                      {nutritionWard.access_level === 'edit'
+                        ? 'Доступно редактирование'
+                        : 'Только просмотр'}
+                    </span>
+                  </div>
+
+                  <button
+                    className="nutrition-secondary"
+                    type="button"
+                    onClick={() => setNutritionWard(null)}
+                  >
+                    Мой план
+                  </button>
+                </div>
+              )}
+
+              <NutritionPlannerView
+                key={nutritionWard?.owner_id ?? 'my-plan'}
+                targetOwnerId={nutritionWard?.owner_id}
+                canEdit={
+                  !nutritionWard ||
+                  nutritionWard.access_level === 'edit'
+                }
+              />
+            </>
+          )}
                     {view !== 'biorhythms' &&
             view !== 'habits' &&
             view !== 'nutrition' && (

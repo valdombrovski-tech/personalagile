@@ -27,10 +27,15 @@ export type Food = {
 
 export type PlanItem = {
   id: string
+  user_id: string
   plan_date: string
   meal: MealType
   grams: number
   position: number
+  updated_by: string | null
+  updated_at: string
+  deleted_at: string | null
+  deleted_by: string | null
   food: Food
 }
 

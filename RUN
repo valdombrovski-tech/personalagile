@@ -10,3 +10,9 @@ VITE v8.3.1  ready in ...
 vercel login
 
 npm run build
+
+git add .
+git commit -m "Add barcode search and camera scanner"
+git push
+
+vercel --prod
