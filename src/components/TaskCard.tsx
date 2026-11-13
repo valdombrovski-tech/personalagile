@@ -1,8 +1,9 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { Inbox, Lightbulb, Check } from 'lucide-react'
-import { LifeAreaBadge, LifeAreaIcon } from './LifeAreas'
+import { Inbox, Lightbulb, Check, Clock } from 'lucide-react'
+import { LifeAreaIcon, LifeAreaTag } from './LifeAreas'
 import { TaskDetails } from './TaskDetails'
 import { getTaskMeta } from '../lib/tasks'
+import { formatTime } from '../lib/dates'
 import {
   SWIPE_BUTTON_WIDTH,
   handleSwipeEnd,
@@ -27,6 +28,7 @@ type TaskCardProps = {
   checkboxInside?: boolean
   toggleDone?: boolean
   hideAreaIcon?: boolean
+  variant?: 'timeline' | 'todo'
 }
 
 export function TaskCard({
@@ -44,8 +46,15 @@ export function TaskCard({
   checkboxInside = false,
   toggleDone = false,
   hideAreaIcon = false,
+  variant,
 }: TaskCardProps) {
   const meta = getTaskMeta(task)
+  const cardVariant = variant ?? (hideAreaIcon ? 'todo' : undefined)
+  const timeRange = task.start_time
+    ? task.end_time
+      ? `${formatTime(task.start_time)}–${formatTime(task.end_time)}`
+      : formatTime(task.start_time)
+    : ''
   const canSwipe = !isOpen && task.status !== 'done'
   const isSwiped = canSwipe && isSwipedProp
   const swipeButtonsCount =
@@ -120,7 +129,9 @@ export function TaskCard({
         style={
           isSwiped ? { transform: `translateX(-${swipeWidth}px)` } : undefined
         }
-        className={`task-item swipe-content ${isOpen ? 'is-open' : ''} ${
+        className={`task-item swipe-content ${
+          cardVariant ? `task-card--${cardVariant}` : ''
+        } ${isOpen ? 'is-open' : ''} ${
           toggleDone && task.status === 'done' ? 'is-completed' : ''
         }`}
       >
@@ -148,6 +159,12 @@ export function TaskCard({
             </span>
           )}
 
+          {variant === 'timeline' && task.life_area && (
+            <span className="task-area-tile" aria-hidden="true">
+              <LifeAreaIcon area={task.life_area} />
+            </span>
+          )}
+
           <button
             className="task-summary"
             type="button"
@@ -163,15 +180,27 @@ export function TaskCard({
             }}
             aria-expanded={isOpen}
           >
-            <span className="task-title">
-              {task.life_area && !hideAreaIcon && (
-                <LifeAreaIcon area={task.life_area} />
-              )}
-              {task.title}
-            </span>
+            <span className="task-title">{task.title}</span>
+
+            {(variant === 'timeline' || cardVariant === 'todo') &&
+              task.description && (
+              <span className="task-description">{task.description}</span>
+            )}
+
             {hideAreaIcon
-              ? task.life_area && <LifeAreaBadge area={task.life_area} />
-              : meta && <span className="task-meta">{meta}</span>}
+              ? null
+              : variant === 'timeline'
+                ? timeRange && (
+                    <span className="task-meta">
+                      <Clock size={10} aria-hidden="true" />
+                      {timeRange}
+                    </span>
+                  )
+                : meta && <span className="task-meta">{meta}</span>}
+
+            {cardVariant && task.life_area && (
+              <LifeAreaTag area={task.life_area} />
+            )}
           </button>
 
           {checkboxInside && isOpen && (

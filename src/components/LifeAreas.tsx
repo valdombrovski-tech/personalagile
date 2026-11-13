@@ -1,5 +1,9 @@
 import { Circle } from 'lucide-react'
-import { LIFE_AREAS, LIFE_AREA_COLORS } from '../lib/lifeAreas'
+import {
+  LIFE_AREAS,
+  LIFE_AREA_COLORS,
+  LIFE_AREA_SHORT_LABELS,
+} from '../lib/lifeAreas'
 import type { LifeArea } from '../lib/types'
 
 export function LifeAreaIcon({ area }: { area: LifeArea | null }) {
@@ -23,6 +27,14 @@ export function LifeAreaBadge({ area }: { area: LifeArea }) {
       style={{ background: colors.bg, color: colors.text }}
     >
       {found.label}
+    </span>
+  )
+}
+
+export function LifeAreaTag({ area }: { area: LifeArea }) {
+  return (
+    <span className="life-tag" data-area={area}>
+      {LIFE_AREA_SHORT_LABELS[area]}
     </span>
   )
 }

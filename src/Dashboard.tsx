@@ -522,7 +522,7 @@ function Dashboard() {
 
 
   const headerTitleParts = headerTitle.split(', ')
-
+  const hideHeaderNote = view === 'today' && !isAccountPageOpen
 
   return (
     <main className="dashboard">
@@ -538,7 +538,7 @@ function Dashboard() {
           </h1>
 
 
-          <div className="header-note">
+<div className={`header-note ${hideHeaderNote ? 'is-hidden' : ''}`}>
             <p className="header-subtitle">{headerNote}</p>
 
 
@@ -758,7 +758,7 @@ function Dashboard() {
               type="button"
               onClick={() => goToView('done')}
             >
-              Посмотреть выполненные задачи
+              Показать завершенные...
             </button>
           )}
         </>

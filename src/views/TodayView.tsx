@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { EventTimeline } from '../components/EventTimeline'
 import { TaskList } from '../components/TaskList'
 import { getTodayString, getWeekDays } from '../lib/dates'
-import { getOverdueTasks, isEventPast } from '../lib/taskSelectors'
+import { getOverdueTasks } from '../lib/taskSelectors'
 import type { TaskActions, TaskSelection } from '../lib/taskViewTypes'
 import type { Task } from '../lib/types'
 
@@ -31,17 +31,6 @@ export function TodayView({
     return () => window.clearInterval(intervalId)
   }, [])
 
-  function changeSelectedDate(days: number) {
-    const date = new Date(`${selectedDate}T00:00:00`)
-    date.setDate(date.getDate() + days)
-
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-
-    onSelectDate(`${year}-${month}-${day}`)
-  }
-
   const todayString = getTodayString()
   const weekDays = getWeekDays(selectedDate)
 
@@ -65,56 +54,10 @@ export function TodayView({
 
   const overdueTasks = selectedDate === todayString ? getOverdueTasks(tasks) : []
 
-  const pastEventsCount = todayEvents.filter((task, index) =>
-    isEventPast(task, index, todayEvents, now)
-  ).length
-
-  const doneTasksCount = todayTasks.filter(
-    (task) => task.status === 'done'
-  ).length
-
   return (
     <>
       <section className="today-view">
         <div className="week-bar">
-          <div className="week-bar-top">
-            <p className="week-month">
-              {new Date(`${selectedDate}T00:00:00`).toLocaleDateString(
-                'ru-RU',
-                { month: 'long', year: 'numeric' }
-              )}
-            </p>
-
-            <div className="week-bar-actions">
-              {selectedDate !== todayString && (
-                <button
-                  className="week-today-button"
-                  type="button"
-                  onClick={() => onSelectDate(todayString)}
-                >
-                  Сегодня
-                </button>
-              )}
-
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => changeSelectedDate(-7)}
-                aria-label="Предыдущая неделя"
-              >
-                ‹
-              </button>
-
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => changeSelectedDate(7)}
-                aria-label="Следующая неделя"
-              >
-                ›
-              </button>
-            </div>
-          </div>
 
           <div className="week-strip">
             {weekDays.map((day) => {
@@ -150,7 +93,7 @@ export function TodayView({
         <section className="task-section">
           <div className="task-section-heading">
             <div className="heading-with-hint">
-              <h3>События</h3>
+              <h3>Дэйли план</h3>
               <button
                 className="hint-button"
                 type="button"
@@ -161,9 +104,6 @@ export function TodayView({
                 ?
               </button>
             </div>
-            <span>
-              {pastEventsCount} из {todayEvents.length}
-            </span>
           </div>
 
           {showEventsHint && (
@@ -207,9 +147,6 @@ export function TodayView({
                 ?
               </button>
             </div>
-            <span>
-              {doneTasksCount} из {todayTasks.length}
-            </span>
           </div>
 
           {showTodoHint && (
@@ -228,6 +165,7 @@ export function TodayView({
             emptyText="На этот день задач пока нет."
             toggleDone
             hideAreaIcon
+            variant="todo"
             renderActions={(task) => (
               <>
                 <button type="button" onClick={() => void actions.moveToInbox(task)}>

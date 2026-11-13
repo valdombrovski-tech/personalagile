@@ -41,12 +41,12 @@ export function EventTimeline({
             <span className="timeline-dot" aria-hidden="true" />
             <p className="timeline-time">
               {formatTime(task.start_time)}
-              {task.end_time ? ` – ${formatTime(task.end_time)}` : ''}
             </p>
             <TaskCard
               {...getTaskCardProps(task, selection, actions)}
               actions={renderActions(task)}
               checkboxInside
+              variant="timeline"
             />
           </div>
         )

@@ -14,6 +14,7 @@ type TaskListProps = {
   showDoneCheckbox?: boolean
   toggleDone?: boolean
   hideAreaIcon?: boolean
+  variant?: 'timeline' | 'todo'
 }
 
 export function TaskList({
@@ -25,11 +26,13 @@ export function TaskList({
   showDoneCheckbox = true,
   toggleDone = false,
   hideAreaIcon = false,
+  variant,
 }: TaskListProps) {
   if (!tasks.length) {
     return <EmptyState text={emptyText} />
   }
 
+  
   return (
     <div className="task-list">
       {tasks.map((task) => (
@@ -40,6 +43,7 @@ export function TaskList({
           showDoneCheckbox={showDoneCheckbox}
           toggleDone={toggleDone}
           hideAreaIcon={hideAreaIcon}
+                    variant={variant}
         />
       ))}
     </div>

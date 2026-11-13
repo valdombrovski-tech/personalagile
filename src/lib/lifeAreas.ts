@@ -29,3 +29,13 @@ export const LIFE_AREA_COLORS: Record<LifeArea, { bg: string; text: string }> = 
   content: { bg: '#E3F4E1', text: '#3C8A36' },
   sport: { bg: '#D9F2F0', text: '#1F8A83' },
 }
+
+export const LIFE_AREA_SHORT_LABELS: Record<LifeArea, string> = {
+  meetings: 'Встречи',
+  home: 'Дом',
+  work: 'Работа',
+  health: 'Здоровье',
+  shopping: 'Покупки',
+  content: 'Контент',
+  sport: 'Спорт',
+}
