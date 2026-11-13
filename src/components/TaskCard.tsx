@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { Inbox, Lightbulb, Check, Clock } from 'lucide-react'
+import { Inbox, Lightbulb, Check, Circle, Clock } from 'lucide-react'
 import { LifeAreaIcon, LifeAreaTag } from './LifeAreas'
 import { TaskDetails } from './TaskDetails'
 import { getTaskMeta } from '../lib/tasks'
@@ -9,6 +10,8 @@ import {
   handleSwipeEnd,
   handleSwipeMove,
   handleSwipeStart,
+    handleRevealEnd,
+  handleRevealMove,
   isSwipeJustHappened,
 } from '../lib/swipe'
 import type { Task } from '../lib/types'
@@ -29,6 +32,7 @@ type TaskCardProps = {
   toggleDone?: boolean
   hideAreaIcon?: boolean
   variant?: 'timeline' | 'todo'
+    isPast?: boolean
 }
 
 export function TaskCard({
@@ -47,15 +51,19 @@ export function TaskCard({
   toggleDone = false,
   hideAreaIcon = false,
   variant,
+  isPast: isPastProp = false,
 }: TaskCardProps) {
   const meta = getTaskMeta(task)
-  const cardVariant = variant ?? (hideAreaIcon ? 'todo' : undefined)
+
+  const [isClosing, setIsClosing] = useState(false)
+ const cardVariant = variant ?? (hideAreaIcon ? 'todo' : undefined)
+  const isPast = isPastProp || cardVariant === 'todo'
   const timeRange = task.start_time
     ? task.end_time
       ? `${formatTime(task.start_time)}–${formatTime(task.end_time)}`
       : formatTime(task.start_time)
     : ''
-  const canSwipe = !isOpen && task.status !== 'done'
+  const canSwipe = !isOpen && (isPast || task.status !== 'done')
   const isSwiped = canSwipe && isSwipedProp
   const swipeButtonsCount =
     1 + (task.status !== 'inbox' ? 1 : 0) + (task.status !== 'idea' ? 1 : 0)
@@ -66,21 +74,47 @@ export function TaskCard({
       onSwipeChange(open ? task.id : null)
     )
 
-  const swipeHandlers = canSwipe
-    ? {
-        onPointerDown: handleSwipeStart,
-        onPointerMove: (event: ReactPointerEvent<HTMLElement>) =>
-          handleSwipeMove(event, swipeWidth, isSwiped),
-        onPointerUp: finishSwipe,
-        onPointerCancel: finishSwipe,
-        onPointerLeave: finishSwipe,
+  const finishReveal = () =>
+    handleRevealEnd((open) => {
+      if (!open && isSwiped) {
+        setIsClosing(true)
+        window.setTimeout(() => setIsClosing(false), 500)
       }
-    : {}
+      onSwipeChange(open ? task.id : null)
+    })
+
+  const swipeHandlers = !canSwipe
+    ? {}
+    : isPast
+      ? {
+          onPointerDown: handleSwipeStart,
+          onPointerMove: handleRevealMove,
+          onPointerUp: finishReveal,
+          onPointerCancel: finishReveal,
+          onPointerLeave: finishReveal,
+        }
+      : {
+          onPointerDown: handleSwipeStart,
+          onPointerMove: (event: ReactPointerEvent<HTMLElement>) =>
+            handleSwipeMove(event, swipeWidth, isSwiped),
+          onPointerUp: finishSwipe,
+          onPointerCancel: finishSwipe,
+          onPointerLeave: finishSwipe,
+        }
 
   return (
-    <div className="swipe-wrap">
+      <div
+      className={`swipe-wrap ${
+        cardVariant === 'todo' ? 'swipe-wrap--todo' : ''
+      } ${isPast && isSwiped ? 'is-revealed' : ''}`}
+    >
       {canSwipe && (
-        <div className="swipe-actions" style={{ width: swipeWidth }}>
+            <div
+          className={`swipe-actions ${isPast ? 'swipe-actions--reveal' : ''} ${
+            cardVariant === 'todo' ? 'swipe-actions--todo' : ''
+          } ${isPast && isSwiped ? 'is-shown' : ''}`}
+          style={isPast ? undefined : { width: swipeWidth }}
+        >
           {task.status !== 'inbox' && (
             <button
               className="swipe-action swipe-inbox"
@@ -109,29 +143,46 @@ export function TaskCard({
               <Lightbulb size={20} />
             </button>
           )}
-          <button
-            className="swipe-action swipe-done"
+                   <button
+            className={`swipe-action swipe-done ${
+              task.status === 'done' ? 'is-done' : ''
+            }`}
             type="button"
-            aria-label="Готово"
-            title="Готово"
+            aria-label={
+              task.status === 'done' ? 'Вернуть в работу' : 'Готово'
+            }
+            title={task.status === 'done' ? 'Вернуть в работу' : 'Готово'}
             onClick={() => {
-              onSwipeChange(null)
-              void onMoveToDone(task)
+              if (!isPast) onSwipeChange(null)
+
+              if (task.status === 'done') {
+                void onUpdate(task.id, { status: 'active' })
+              } else {
+                void onMoveToDone(task)
+              }
             }}
           >
-            <Check size={20} />
+            {task.status === 'done' ? (
+              <Check size={20} />
+            ) : (
+              <Circle size={20} />
+            )}
           </button>
         </div>
       )}
 
       <article
         {...swipeHandlers}
-        style={
-          isSwiped ? { transform: `translateX(-${swipeWidth}px)` } : undefined
+             style={
+          isSwiped && !isPast
+            ? { transform: `translateX(-${swipeWidth}px)` }
+            : undefined
         }
         className={`task-item swipe-content ${
           cardVariant ? `task-card--${cardVariant}` : ''
-        } ${isOpen ? 'is-open' : ''} ${
+        } ${isOpen ? 'is-open' : ''} ${isPast ? 'is-past-card' : ''} ${
+          isPast && isSwiped ? 'is-revealed' : ''
+        } ${isClosing ? 'is-closing' : ''} ${
           toggleDone && task.status === 'done' ? 'is-completed' : ''
         }`}
       >

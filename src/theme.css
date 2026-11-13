@@ -577,3 +577,186 @@ input[type='datetime-local'] {
 .task-card--todo .task-summary:not(:has(.task-description)) {
   grid-template-areas: 'title tag';
 }
+
+/* ===== Прошедшие события: кнопки справа вместо свайпа ===== */
+.timeline-item.is-past .swipe-wrap { overflow: visible; }
+
+.swipe-actions--reveal {
+  position: absolute;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: calc(100% + 8px);
+  width: 32px;
+  display: flex;
+  flex-direction: column-reverse; /* Готово сверху, Inbox снизу */
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.6);
+  transform-origin: left center;
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s ease;
+}
+.swipe-actions--reveal.is-shown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+.swipe-actions--reveal .swipe-action {
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+}
+.swipe-actions--reveal .swipe-action svg { width: 16px; height: 16px; }
+.swipe-actions--reveal .swipe-ideas { display: none; }
+
+/* Пружина карточки: «отскок» от таймлайна */
+.timeline-item.is-past .task-item.is-revealed {
+
+  animation: card-rebound 0.45s ease-out;
+}
+@keyframes card-rebound {
+  0%   { transform: translateX(0); }
+  30%  { transform: translateX(-8px); }
+  60%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+/* Закрытие: карточка налетает на исчезающие иконки и отскакивает */
+.timeline-item.is-past .task-item.is-closing {
+  animation: card-rebound-close 0.5s ease-out;
+}
+@keyframes card-rebound-close {
+  0%   { transform: translateX(0); }
+  28%  { transform: translateX(12px); }
+  58%  { transform: translateX(-4px); }
+  80%  { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+/* Кнопка «Готово»: пустой круг = не выполнена, галочка = выполнена */
+.swipe-actions--reveal .swipe-done {
+  box-sizing: border-box;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.swipe-actions--reveal .swipe-done:not(.is-done) {
+  border: 1.5px solid #4cb782;
+  color: #4cb782;
+  background: rgba(76, 183, 130, 0.18);
+}
+.swipe-actions--reveal .swipe-done.is-done {
+  border: 1.5px solid #4cb782;
+  color: #ffffff;
+  background: #4cb782;
+}
+
+/* ===== Крупные карточки таймлайна: кнопки справа, сжатие ===== */
+.timeline-item .swipe-wrap { overflow: visible; }
+
+/* ширина: полная -> 85% (как у прошедшей), с пружиной */
+.timeline-item:not(.is-past) .swipe-wrap {
+  width: 100%;
+  max-width: 100%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.timeline-item:not(.is-past) .swipe-wrap.is-revealed {
+  width: calc(100% - 48px); /* ровно столько занимают плитка и промежуток */
+}
+
+/* отскок карточки для всех карточек таймлайна */
+.timeline-item .task-item.is-revealed {
+  animation: card-rebound 0.45s ease-out;
+}
+.timeline-item .task-item.is-closing {
+  animation: card-rebound-close 0.5s ease-out;
+}
+
+/* плитка сферы жизни: сжимается, тает и освобождает место тексту */
+.task-area-tile {
+  overflow: hidden;
+  transition:
+    flex-basis 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    margin 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 0.4s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s ease;
+}
+.task-item.is-revealed .task-area-tile {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  margin-right: -12px; /* компенсирует gap: 12px в .task-item-main */
+  border-width: 0;
+  opacity: 0;
+  transform: scale(0.3) rotate(-25deg);
+}
+
+/* Крупные карточки: без пружины карточки при свайпе */
+.timeline-item:not(.is-past) .task-item.is-revealed,
+.timeline-item:not(.is-past) .task-item.is-closing {
+  animation: none;
+}
+
+/* ===== To-do: свайп с кнопками справа, без отскока ===== */
+.swipe-wrap--todo {
+  overflow: visible;
+  width: 100%;
+  max-width: 100%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* 42px = чекбокс 30px + промежуток 12px: текст остаётся на месте */
+.swipe-wrap--todo.is-revealed {
+  width: calc(100% - 42px);
+}
+
+/* кнопки: «В Ideas» сверху (вместо «Готово»), «В Inbox» снизу */
+.swipe-actions--todo .swipe-done { display: none; }
+.swipe-actions--reveal.swipe-actions--todo .swipe-ideas { display: flex; }
+
+/* большой чекбокс схлопывается при левом свайпе */
+.task-card--todo .task-checkbox {
+  transition:
+    flex-basis 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    margin 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 0.4s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s ease,
+    background-color 0.2s ease,
+    background-size 0.2s ease;
+}
+.task-card--todo.is-revealed .task-checkbox {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  margin-right: -12px; /* компенсирует gap: 12px */
+  padding: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: scale(0.3) rotate(-25deg);
+}
+
+/* Кнопки при свайпе у To-do: компактнее, стопка ниже карточки */
+.swipe-actions--reveal.swipe-actions--todo {
+  width: 26px;
+  gap: 6px;
+}
+.swipe-actions--reveal.swipe-actions--todo .swipe-action {
+  flex: 0 0 26px;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  min-height: 26px;
+}
+.swipe-actions--reveal.swipe-actions--todo .swipe-action svg {
+  width: 14px;
+  height: 14px;
+}

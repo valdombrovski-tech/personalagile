@@ -47,6 +47,7 @@ export function EventTimeline({
               actions={renderActions(task)}
               checkboxInside
               variant="timeline"
+                                          isPast
             />
           </div>
         )

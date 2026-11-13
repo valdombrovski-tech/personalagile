@@ -72,3 +72,41 @@ export function handleSwipeEnd(
 
   onResult(swipeOffset < -width / 2)
 }
+
+export const REVEAL_THRESHOLD = 24
+
+export function handleRevealMove(event: ReactPointerEvent<HTMLElement>) {
+  if (!swipeActive) return
+
+  const dx = event.clientX - swipeStartX
+  const dy = event.clientY - swipeStartY
+
+  if (!swipeIsHorizontal) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+
+    if (Math.abs(dy) > Math.abs(dx)) {
+      swipeActive = false
+      return
+    }
+
+    swipeIsHorizontal = true
+  }
+
+  swipeOffset = dx
+}
+
+export function handleRevealEnd(onResult: (isOpen: boolean) => void) {
+  if (!swipeActive) return
+
+  swipeActive = false
+
+  if (!swipeIsHorizontal) return
+
+  swipeJustHappened = true
+  window.setTimeout(() => {
+    swipeJustHappened = false
+  }, 50)
+
+  if (swipeOffset <= -REVEAL_THRESHOLD) onResult(true)
+  else if (swipeOffset >= REVEAL_THRESHOLD) onResult(false)
+}

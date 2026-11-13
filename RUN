@@ -4,6 +4,8 @@ cd C:\Users\admin\projects\personal-agile
 
 npm run dev
 
+Mobile Preview: Show
+
 VITE v8.3.1  ready in ...
 ➜  Local:   http://localhost:5173/
 
@@ -12,7 +14,7 @@ vercel login
 npm run build
 
 git add .
-git commit -m "massive food planner update 16.10"
+git commit -m "massive UI update 13.11"
 git push
 
 vercel --prod
